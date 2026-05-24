@@ -868,6 +868,8 @@ class MemberController extends BaseController {
                 $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 $ok = $status >= 200 && $status < 300;
                 $body = is_string($resp) ? $resp : '';
+            } else {
+                $body = (string)curl_error($ch);
             }
             curl_close($ch);
         } else {
