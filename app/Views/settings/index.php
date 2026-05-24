@@ -22,9 +22,14 @@
         <div class="p-6 sm:p-8 lg:p-10">
             <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
                 <input id="admin-reset-link" type="text" readonly value="<?php echo htmlspecialchars($adminResetLink); ?>" class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-xs font-black text-slate-200 outline-none">
-                <button type="button" id="admin-reset-link-copy" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow">
-                    Copy
-                </button>
+                <div class="flex gap-2">
+                    <a href="<?php echo htmlspecialchars($adminResetLink); ?>" target="_blank" rel="noopener noreferrer" class="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 inline-flex items-center justify-center">
+                        Open
+                    </a>
+                    <button type="button" id="admin-reset-link-copy" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow">
+                        Copy
+                    </button>
+                </div>
             </div>
             <p class="mt-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">This link expires in 30 minutes.</p>
         </div>

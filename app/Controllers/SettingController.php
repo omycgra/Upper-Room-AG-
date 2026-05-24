@@ -468,8 +468,7 @@ class SettingController extends BaseController {
                 [(int)Session::get('user_id'), $tokenHash, $expiresAt, $requestId]
             );
 
-            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
-            $resetLink = $base . '/reset-password?token=' . urlencode($token);
+            $resetLink = rtrim((string)BASE_URL, '/') . '/reset-password?token=' . urlencode($token);
             Session::flash('admin_reset_link', $resetLink);
             Session::flash('admin_reset_target', (string)($req['email'] ?? ''));
             AuditLog::log("Approved password reset request for user: " . ($req['email'] ?? 'Unknown'), "password_reset_requests", $requestId);
