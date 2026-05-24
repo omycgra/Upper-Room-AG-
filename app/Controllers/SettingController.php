@@ -52,6 +52,12 @@ class SettingController extends BaseController {
         $smsTwilioAccountSid = AppConfig::getSetting('sms_twilio_account_sid', '');
         $smsTwilioAuthToken = AppConfig::getSetting('sms_twilio_auth_token', '');
         $smsTwilioFrom = AppConfig::getSetting('sms_twilio_from', '');
+        $storageConfig = [
+            'supabase_url' => trim((string)Env::get('SUPABASE_URL', '')),
+            'bucket' => trim((string)Env::get('SUPABASE_STORAGE_BUCKET', '')) !== '' ? trim((string)Env::get('SUPABASE_STORAGE_BUCKET', '')) : 'uploads',
+            'has_service_role_key' => trim((string)Env::get('SUPABASE_SERVICE_ROLE_KEY', '')) !== '',
+        ];
+        $storageConfig['enabled'] = ($storageConfig['supabase_url'] !== '' && $storageConfig['has_service_role_key']);
         $dbDriver = strtolower((string)Env::get('DB_DRIVER', 'mysql'));
         if (in_array($dbDriver, ['postgres', 'postgresql'], true)) {
             $dbDriver = 'pgsql';
@@ -89,6 +95,7 @@ class SettingController extends BaseController {
             'smsTwilioAccountSid' => $smsTwilioAccountSid,
             'smsTwilioAuthToken' => $smsTwilioAuthToken,
             'smsTwilioFrom' => $smsTwilioFrom,
+            'storageConfig' => $storageConfig,
             'dbConfig' => $dbConfig,
             'me' => $me,
             'activeUsers' => $activeUsers,
@@ -1001,17 +1008,19 @@ class SettingController extends BaseController {
 
         $ok = false;
         $status = 0;
+        $body = '';
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_HEADER, false);
             $resp = curl_exec($ch);
             if ($resp !== false) {
                 $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 $ok = $status >= 200 && $status < 300;
+                $body = is_string($resp) ? $resp : '';
             }
             curl_close($ch);
         } else {
@@ -1024,6 +1033,7 @@ class SettingController extends BaseController {
                 ]
             ]);
             $resp = @file_get_contents($url, false, $context);
+            $body = is_string($resp) ? $resp : '';
             $status = 0;
             if (isset($http_response_header) && is_array($http_response_header)) {
                 foreach ($http_response_header as $h) {
@@ -1037,7 +1047,18 @@ class SettingController extends BaseController {
         }
 
         if (!$ok) {
-            throw new Exception('Cloud upload failed.');
+            $hint = '';
+            $decoded = json_decode((string)$body, true);
+            if (is_array($decoded)) {
+                $hint = (string)($decoded['message'] ?? $decoded['error'] ?? '');
+            }
+            if ($hint === '' && $body !== '') {
+                $hint = substr(trim((string)$body), 0, 180);
+            }
+            $msg = 'Cloud upload failed';
+            if ($status > 0) $msg .= " (HTTP $status)";
+            if ($hint !== '') $msg .= ': ' . $hint;
+            throw new Exception($msg);
         }
 
         return $base . '/storage/v1/object/public/' . rawurlencode($bucket) . '/' . $encodedPath;

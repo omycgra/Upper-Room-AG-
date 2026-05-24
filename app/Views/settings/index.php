@@ -531,6 +531,29 @@
                 </div>
             </div>
 
+            <?php $storageConfig = $storageConfig ?? ['enabled' => false, 'bucket' => 'uploads', 'supabase_url' => '', 'has_service_role_key' => false]; ?>
+            <div class="mb-10 rounded-[2rem] border border-white/10 bg-white/5 p-5 sm:p-6">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Photo Sync</p>
+                        <p class="mt-2 text-sm font-black text-slate-200">
+                            <?php echo !empty($storageConfig['enabled']) ? 'SUPABASE STORAGE ENABLED' : 'SUPABASE STORAGE DISABLED'; ?>
+                        </p>
+                        <p class="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-500 break-all">
+                            Bucket: <?php echo htmlspecialchars((string)($storageConfig['bucket'] ?? 'uploads')); ?>
+                        </p>
+                    </div>
+                    <span class="px-4 py-2 text-[9px] font-black rounded-full uppercase tracking-widest border shrink-0 <?php echo !empty($storageConfig['enabled']) ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-rose-500/10 text-rose-200 border-rose-500/20'; ?>">
+                        <?php echo !empty($storageConfig['enabled']) ? 'ON' : 'OFF'; ?>
+                    </span>
+                </div>
+                <?php if (empty($storageConfig['enabled'])): ?>
+                    <p class="mt-4 text-[11px] font-bold text-slate-400">
+                        To sync pictures between Local and Railway, set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY on both environments.
+                    </p>
+                <?php endif; ?>
+            </div>
+
             <form action="<?php echo BASE_URL; ?>/settings/updateDatabaseConnection" method="POST" class="space-y-8">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-3">

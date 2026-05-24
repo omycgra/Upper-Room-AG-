@@ -851,17 +851,19 @@ class MemberController extends BaseController {
 
         $ok = false;
         $status = 0;
+        $body = '';
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_HEADER, false);
             $resp = curl_exec($ch);
             if ($resp !== false) {
                 $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 $ok = $status >= 200 && $status < 300;
+                $body = is_string($resp) ? $resp : '';
             }
             curl_close($ch);
         } else {
@@ -874,6 +876,7 @@ class MemberController extends BaseController {
                 ]
             ]);
             $resp = @file_get_contents($url, false, $context);
+            $body = is_string($resp) ? $resp : '';
             $status = 0;
             if (isset($http_response_header) && is_array($http_response_header)) {
                 foreach ($http_response_header as $h) {
@@ -887,7 +890,18 @@ class MemberController extends BaseController {
         }
 
         if (!$ok) {
-            throw new Exception('Cloud upload failed.');
+            $hint = '';
+            $decoded = json_decode((string)$body, true);
+            if (is_array($decoded)) {
+                $hint = (string)($decoded['message'] ?? $decoded['error'] ?? '');
+            }
+            if ($hint === '' && $body !== '') {
+                $hint = substr(trim((string)$body), 0, 180);
+            }
+            $msg = 'Cloud upload failed';
+            if ($status > 0) $msg .= " (HTTP $status)";
+            if ($hint !== '') $msg .= ': ' . $hint;
+            throw new Exception($msg);
         }
 
         return $base . '/storage/v1/object/public/' . rawurlencode($bucket) . '/' . $encodedPath;
