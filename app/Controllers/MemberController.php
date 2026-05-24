@@ -783,7 +783,11 @@ class MemberController extends BaseController {
     }
 
     private function normalizeUploadPath($path) {
-        $p = str_replace('\\', '/', (string)$path);
+        $pRaw = trim((string)$path);
+        if ($pRaw !== '' && preg_match('#^https?://#i', $pRaw)) {
+            return $pRaw;
+        }
+        $p = str_replace('\\', '/', $pRaw);
         $p = ltrim(trim($p), '/');
         $posPublic = strpos($p, 'public/uploads/');
         if ($posPublic !== false) {
