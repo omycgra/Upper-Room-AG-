@@ -1162,24 +1162,11 @@
                             <span class="hidden truncate text-xs font-bold text-slate-300 sm:inline"><?php echo Session::get('user_name', 'Admin'); ?></span>
                             <span class="truncate text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Profile</span>
                             <?php
-                                $userPhotoPath = str_replace('\\', '/', (string)Session::get('user_photo', ''));
-                                $userPhotoPath = ltrim(trim($userPhotoPath), '/');
-                                $posPublicUploads = strpos($userPhotoPath, 'public/uploads/');
-                                if ($posPublicUploads !== false) {
-                                    $userPhotoPath = substr($userPhotoPath, $posPublicUploads);
-                                } else {
-                                    $posUploads = strpos($userPhotoPath, 'uploads/');
-                                    if ($posUploads !== false) {
-                                        $userPhotoPath = substr($userPhotoPath, $posUploads);
-                                    }
-                                }
-                                if ($userPhotoPath !== '' && strpos($userPhotoPath, 'uploads/') === 0) {
-                                    $userPhotoPath = 'public/' . $userPhotoPath;
-                                }
+                                $userPhotoUrl = Branding::mediaUrl((string)Session::get('user_photo', ''));
                             ?>
                             <div class="w-8 h-8 bg-accent rounded-xl flex items-center justify-center overflow-hidden">
-                                <?php if ($userPhotoPath !== ''): ?>
-                                    <img src="<?php echo BASE_URL . '/' . $userPhotoPath; ?>" alt="Admin" class="w-full h-full object-cover">
+                                <?php if ($userPhotoUrl !== ''): ?>
+                                    <img src="<?php echo htmlspecialchars($userPhotoUrl); ?>" alt="Admin" class="w-full h-full object-cover">
                                 <?php else: ?>
                                     <i class="fas fa-user text-slate-900 text-xs"></i>
                                 <?php endif; ?>

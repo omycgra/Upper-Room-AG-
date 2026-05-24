@@ -2,6 +2,29 @@
 
 class Branding
 {
+    public static function mediaUrl(string $storedPath): string
+    {
+        $p = trim(str_replace('\\', '/', $storedPath));
+        if ($p === '') return '';
+
+        if (preg_match('#^https?://#i', $p)) {
+            return $p;
+        }
+
+        $p = ltrim($p, '/');
+        $posPublic = strpos($p, 'public/uploads/');
+        if ($posPublic !== false) {
+            $p = substr($p, $posPublic);
+        } else {
+            $posUploads = strpos($p, 'uploads/');
+            if ($posUploads !== false) {
+                $p = 'public/' . substr($p, $posUploads);
+            }
+        }
+
+        return rtrim((string)BASE_URL, '/') . '/' . $p;
+    }
+
     public static function getLogoPath(): ?string
     {
         $configured = trim((string)AppConfig::getSetting('church_logo', ''));

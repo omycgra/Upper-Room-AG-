@@ -155,21 +155,7 @@
         <?php else: ?>
             <?php foreach ($members as $member): ?>
                 <?php
-                    $photoPath = str_replace('\\', '/', (string)($member['photo_path'] ?? ''));
-                    $photoPath = ltrim(trim($photoPath), '/');
-                    $posPublicUploads = strpos($photoPath, 'public/uploads/');
-                    if ($posPublicUploads !== false) {
-                        $photoPath = substr($photoPath, $posPublicUploads);
-                    } else {
-                        $posUploads = strpos($photoPath, 'uploads/');
-                        if ($posUploads !== false) {
-                            $photoPath = substr($photoPath, $posUploads);
-                        }
-                    }
-                    if ($photoPath !== '' && strpos($photoPath, 'uploads/') === 0) {
-                        $photoPath = 'public/' . $photoPath;
-                    }
-                    $memberPhotoUrl = $photoPath !== '' ? (BASE_URL . '/' . $photoPath) : '';
+                    $memberPhotoUrl = Branding::mediaUrl((string)($member['photo_path'] ?? ''));
                 ?>
                 <div class="glass-card rounded-[2rem] p-4 sm:p-5 border-white/10">
                     <div class="flex items-start gap-4">
@@ -249,21 +235,7 @@
                 <?php else: ?>
                     <?php foreach ($members as $member): ?>
                         <?php
-                            $photoPath = str_replace('\\', '/', (string)($member['photo_path'] ?? ''));
-                            $photoPath = ltrim(trim($photoPath), '/');
-                            $posPublicUploads = strpos($photoPath, 'public/uploads/');
-                            if ($posPublicUploads !== false) {
-                                $photoPath = substr($photoPath, $posPublicUploads);
-                            } else {
-                                $posUploads = strpos($photoPath, 'uploads/');
-                                if ($posUploads !== false) {
-                                    $photoPath = substr($photoPath, $posUploads);
-                                }
-                            }
-                            if ($photoPath !== '' && strpos($photoPath, 'uploads/') === 0) {
-                                $photoPath = 'public/' . $photoPath;
-                            }
-                            $memberPhotoUrl = $photoPath !== '' ? (BASE_URL . '/' . $photoPath) : '';
+                            $memberPhotoUrl = Branding::mediaUrl((string)($member['photo_path'] ?? ''));
                         ?>
                         <tr class="hover:bg-white/[0.03] transition-all duration-300 group">
                             <td class="px-10 py-6">

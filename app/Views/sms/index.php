@@ -131,7 +131,7 @@
                                 <input type="checkbox" name="recipients[]" value="<?php echo $phone; ?>" class="recipient-check w-4 h-4 accent-yellow-400" <?php echo ($phone !== '' && in_array($phone, $prefillRecipients, true)) ? 'checked' : ''; ?> <?php echo $phone === '' ? 'disabled' : ''; ?>>
                                 <div class="w-11 h-11 rounded-2xl overflow-hidden bg-slate-800 border border-white/10 flex items-center justify-center flex-shrink-0">
                                     <?php if (!empty($member['photo_path'])): ?>
-                                        <img src="<?php echo BASE_URL . '/' . ltrim($member['photo_path'], '/'); ?>" class="w-full h-full object-cover">
+                                        <img src="<?php echo htmlspecialchars(Branding::mediaUrl((string)$member['photo_path'])); ?>" class="w-full h-full object-cover">
                                     <?php else: ?>
                                         <span class="text-accent font-black text-sm"><?php echo strtoupper(substr($member['first_name'], 0, 1)); ?></span>
                                     <?php endif; ?>

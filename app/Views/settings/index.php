@@ -133,7 +133,7 @@
                             <div class="flex items-center min-w-0">
                                 <div class="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center border border-white/10 mr-4 shrink-0">
                                     <?php if (!empty($user['photo_path'])): ?>
-                                        <img src="<?php echo htmlspecialchars(BASE_URL . '/' . ltrim((string)$user['photo_path'], '/')); ?>" class="w-full h-full object-cover" alt="">
+                                        <img src="<?php echo htmlspecialchars(Branding::mediaUrl((string)$user['photo_path'])); ?>" class="w-full h-full object-cover" alt="">
                                     <?php else: ?>
                                         <span class="text-accent font-black text-lg"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></span>
                                     <?php endif; ?>
@@ -234,7 +234,7 @@
                                     <div class="flex items-center">
                                         <div class="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center border border-white/10 group-hover:bg-accent transition-all duration-500 mr-4">
                                             <?php if (!empty($user['photo_path'])): ?>
-                                                <img src="<?php echo htmlspecialchars(BASE_URL . '/' . ltrim((string)$user['photo_path'], '/')); ?>" class="w-full h-full object-cover rounded-2xl" alt="">
+                                                <img src="<?php echo htmlspecialchars(Branding::mediaUrl((string)$user['photo_path'])); ?>" class="w-full h-full object-cover rounded-2xl" alt="">
                                             <?php else: ?>
                                                 <span class="text-accent group-hover:text-slate-900 font-black text-lg transition-colors"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></span>
                                             <?php endif; ?>
@@ -388,7 +388,7 @@
                 <div class="flex items-center">
                     <div class="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center mr-4 border border-accent/20 overflow-hidden">
                         <?php if (!empty($me['photo_path'])): ?>
-                            <img src="<?php echo BASE_URL . '/' . $me['photo_path']; ?>" alt="Me" class="w-full h-full object-cover">
+                            <img src="<?php echo htmlspecialchars(Branding::mediaUrl((string)$me['photo_path'])); ?>" alt="Me" class="w-full h-full object-cover">
                         <?php else: ?>
                             <i class="fas fa-user text-accent text-lg"></i>
                         <?php endif; ?>

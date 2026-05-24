@@ -892,7 +892,9 @@
                 const display = b.birthday_display || '';
                 const phone = (b.phone || '').trim();
                 const photo = (b.photo_path || '').trim();
-                const photoUrl = photo ? `<?php echo BASE_URL; ?>/${photo.replace(/^\/+/, '')}` : '';
+                const photoUrl = photo
+                    ? (/^https?:\/\//i.test(photo) ? photo : `<?php echo BASE_URL; ?>/${photo.replace(/^\/+/, '')}`)
+                    : '';
                 return `
                     <div class="glass-card p-5 rounded-2xl border-white/5 flex items-center space-x-4 hover:bg-white/5 transition-all">
                         <div class="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center border border-white/10 overflow-hidden">
