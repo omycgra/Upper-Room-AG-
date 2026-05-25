@@ -34,6 +34,10 @@ if ($normalizedPath !== '/' && is_file($filePath)) {
     return false;
 }
 
+$_SERVER['DOCUMENT_ROOT'] = $docRoot;
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['PHP_SELF'] = '/index.php';
+$_SERVER['SCRIPT_FILENAME'] = $docRoot . '/index.php';
+
 require $docRoot . '/index.php';
 return true;
-

@@ -20,7 +20,13 @@ ini_set('display_errors', $appDebug ? '1' : '0');
 // Define Base URL for frontend assets and links
 $baseUrlOverride = trim((string)Env::get('APP_BASE_URL', ''));
 if ($baseUrlOverride !== '') {
-    $baseUrl = rtrim($baseUrlOverride, '/');
+    if (str_starts_with($baseUrlOverride, '/')) {
+        $baseUrl = rtrim($baseUrlOverride, '/');
+    } elseif (preg_match('#^https?://#i', $baseUrlOverride)) {
+        $baseUrl = rtrim($baseUrlOverride, '/');
+    } else {
+        $baseUrl = rtrim('https://' . $baseUrlOverride, '/');
+    }
 } else {
     $scriptName = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
     $baseUrl = rtrim($scriptName, '/');
