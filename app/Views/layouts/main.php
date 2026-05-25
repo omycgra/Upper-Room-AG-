@@ -1252,7 +1252,7 @@
     <button
         type="button"
         id="scroll-top-button"
-        class="scroll-top-button fixed bottom-5 right-4 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-10 z-30 inline-flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-accent text-slate-900 shadow-xl shadow-yellow-500/20 hover-glow-yellow"
+        class="scroll-top-button fixed bottom-5 right-4 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-10 z-[117] inline-flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-accent text-slate-900 shadow-xl shadow-yellow-500/20 hover-glow-yellow"
         aria-label="Scroll to top"
     >
         <i class="fas fa-arrow-up text-sm"></i>
@@ -1574,23 +1574,24 @@
                 }
             });
 
+            const getScrollPosition = function () {
+                const containerScroll = scrollContainer ? (scrollContainer.scrollTop || 0) : 0;
+                const winScroll = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+                return Math.max(containerScroll, winScroll);
+            };
+
             const syncScrollTopButton = function () {
                 if (!scrollTopButton) return;
-                const currentPosition = scrollContainer ? scrollContainer.scrollTop : window.scrollY;
+                const currentPosition = getScrollPosition();
                 scrollTopButton.classList.toggle('is-visible', currentPosition > 260);
             };
 
-            if (scrollContainer) {
-                scrollContainer.addEventListener('scroll', syncScrollTopButton, { passive: true });
-            } else {
-                window.addEventListener('scroll', syncScrollTopButton, { passive: true });
-            }
+            scrollContainer?.addEventListener('scroll', syncScrollTopButton, { passive: true });
+            window.addEventListener('scroll', syncScrollTopButton, { passive: true });
+            window.addEventListener('resize', syncScrollTopButton, { passive: true });
 
             scrollTopButton?.addEventListener('click', function () {
-                if (scrollContainer) {
-                    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-                    return;
-                }
+                scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' });
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
 
