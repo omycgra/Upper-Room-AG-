@@ -1,0 +1,11 @@
+.git
+.gitignore
+.dbg
+installer/output
+public/uploads
+*.log
+.env
+.env.*
+debug-*.md
+*.exe
+*.dat

@@ -1,0 +1,70 @@
+<?php
+
+/**
+ * Church Management System - Entry Point
+ */
+
+// Define root path
+define('ROOT_PATH', __DIR__);
+
+require_once ROOT_PATH . '/app/Helpers/Env.php';
+Env::load(ROOT_PATH . '/.env');
+
+$appEnv = strtolower((string)Env::get('APP_ENV', 'development'));
+$appDebug = Env::bool('APP_DEBUG', $appEnv !== 'production');
+
+// Enable detailed errors only outside production
+error_reporting(E_ALL);
+ini_set('display_errors', $appDebug ? '1' : '0');
+
+// Define Base URL for frontend assets and links
+$baseUrlOverride = trim((string)Env::get('APP_BASE_URL', ''));
+if ($baseUrlOverride !== '') {
+    $baseUrl = rtrim($baseUrlOverride, '/');
+} else {
+    $scriptName = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
+    $baseUrl = rtrim($scriptName, '/');
+}
+define('BASE_URL', $baseUrl);
+
+// Load helpers
+require_once ROOT_PATH . '/app/Helpers/Database.php';
+require_once ROOT_PATH . '/app/Helpers/Session.php';
+require_once ROOT_PATH . '/app/Helpers/SchemaState.php';
+require_once ROOT_PATH . '/app/Helpers/Auth.php';
+require_once ROOT_PATH . '/app/Helpers/AuditLog.php';
+require_once ROOT_PATH . '/app/Helpers/AppConfig.php';
+require_once ROOT_PATH . '/app/Helpers/BirthdayService.php';
+require_once ROOT_PATH . '/app/Helpers/Branding.php';
+require_once ROOT_PATH . '/app/Helpers/Router.php';
+require_once ROOT_PATH . '/app/Helpers/View.php';
+
+// Initialize session
+Session::start();
+
+// Handle routing via query parameter if mod_rewrite is not available
+if (isset($_GET['route'])) {
+    $_SERVER['REQUEST_URI'] = '/' . $_GET['route'];
+}
+
+BirthdayService::runDaily();
+
+// Initialize and dispatch router
+try {
+    $router = new Router();
+    $router->dispatch();
+} catch (Throwable $e) {
+    // Log the error
+    error_log($e->getMessage());
+    
+    // Display a professional error page or message
+    if ($appDebug) {
+        echo "<div style='padding: 20px; background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; font-family: sans-serif;'>";
+        echo "<h2 style='color: #991b1b; margin-top: 0;'>System Error</h2>";
+        echo "<p style='color: #7f1d1d;'><strong>Message:</strong> " . $e->getMessage() . "</p>";
+        echo "<p style='color: #7f1d1d; font-size: 0.8em;'><strong>File:</strong> " . $e->getFile() . " on line " . $e->getLine() . "</p>";
+        echo "</div>";
+    } else {
+        die("A system error occurred. Please contact the administrator.");
+    }
+}
