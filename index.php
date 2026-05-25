@@ -13,6 +13,13 @@ Env::load(ROOT_PATH . '/.env');
 $appEnv = strtolower((string)Env::get('APP_ENV', 'development'));
 $appDebug = Env::bool('APP_DEBUG', $appEnv !== 'production');
 
+// Always show detailed errors on localhost (helps when APP_ENV is production in .env)
+$remoteAddr = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+$serverName = (string)($_SERVER['SERVER_NAME'] ?? '');
+if ($remoteAddr === '127.0.0.1' || $remoteAddr === '::1' || strtolower($serverName) === 'localhost') {
+    $appDebug = true;
+}
+
 // Enable detailed errors only outside production
 error_reporting(E_ALL);
 ini_set('display_errors', $appDebug ? '1' : '0');
@@ -20,7 +27,7 @@ ini_set('display_errors', $appDebug ? '1' : '0');
 // Define Base URL for frontend assets and links
 $baseUrlOverride = trim((string)Env::get('APP_BASE_URL', ''));
 if ($baseUrlOverride !== '') {
-    if (str_starts_with($baseUrlOverride, '/')) {
+    if (substr($baseUrlOverride, 0, 1) === '/') {
         $baseUrl = rtrim($baseUrlOverride, '/');
     } elseif (preg_match('#^https?://#i', $baseUrlOverride)) {
         $baseUrl = rtrim($baseUrlOverride, '/');

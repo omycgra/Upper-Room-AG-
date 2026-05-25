@@ -1163,6 +1163,79 @@
                                 <?php endif; ?>
                             </div>
                         </div>
+                        <?php if (!$isAuditor): ?>
+                            <div id="support-chat-widget" class="relative">
+                                <button type="button" id="support-chat-toggle" class="w-10 h-10 sm:w-11 sm:h-11 inline-flex items-center justify-center rounded-2xl bg-accent text-slate-900 shadow-xl shadow-yellow-500/20 hover-glow-yellow border border-accent/30 relative" aria-label="Open chat">
+                                    <i class="fas fa-comment-dots text-sm"></i>
+                                    <span id="chat-unread-badge" class="hidden absolute -top-2 -right-2 min-w-[1.75rem] h-7 px-2 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center border border-white/20 shadow-xl"></span>
+                                </button>
+                                <div id="chat-toast" class="hidden fixed top-[5.75rem] left-4 right-4 sm:left-auto sm:right-6 sm:w-[30rem] max-w-[92vw] z-[119]">
+                                    <button type="button" id="chat-toast-btn" class="w-full glass-card rounded-[2rem] border-white/10 overflow-hidden shadow-2xl text-left">
+                                        <div class="px-5 py-4 flex items-start gap-4">
+                                            <div id="chat-toast-avatar" class="w-11 h-11 rounded-2xl overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center shrink-0"></div>
+                                            <div class="min-w-0 flex-1">
+                                                <p id="chat-toast-title" class="text-[10px] font-black uppercase tracking-[0.26em] text-accent">New Message</p>
+                                                <p id="chat-toast-name" class="mt-1 text-sm font-black text-slate-200 truncate"></p>
+                                                <p id="chat-toast-preview" class="mt-2 text-[11px] font-bold text-slate-400 truncate"></p>
+                                            </div>
+                                            <div class="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 shrink-0">
+                                                <i class="fas fa-arrow-right"></i>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
+                                <div id="support-chat-panel" class="hidden fixed top-[5.75rem] left-4 right-4 bottom-4 sm:bottom-auto sm:left-auto sm:right-6 sm:w-[30rem] lg:w-[34rem] max-w-[92vw] z-[119]">
+                                    <div class="glass-card rounded-[2.5rem] border-white/10 overflow-hidden shadow-2xl h-full flex flex-col">
+                                        <div class="px-6 py-5 bg-white/[0.03] border-b border-white/10 flex items-start justify-between gap-3 flex-shrink-0">
+                                            <div class="min-w-0">
+                                                <p class="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Assistant</p>
+                                                <h3 class="text-lg font-black text-white truncate">Messages</h3>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <button type="button" id="chat-desktop-notify-toggle" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10">
+                                                    <i class="fas fa-bell text-sm"></i>
+                                                </button>
+                                                <button type="button" id="support-chat-close" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10">
+                                                    <i class="fas fa-times text-sm"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="support-pane-chat" class="p-4 sm:p-6 space-y-4 flex-1 min-h-0 flex flex-col">
+                                            <div id="chat-admin-mobile" class="hidden sm:hidden bg-white/5 border border-white/10 rounded-[2rem] px-4 py-4">
+                                                <label class="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2">Chat With</label>
+                                                <div class="relative">
+                                                    <select id="chat-contact-select" class="w-full bg-slate-950/40 border border-white/10 focus:border-accent rounded-2xl pl-4 pr-10 py-3 text-[11px] font-black text-slate-200 outline-none appearance-none"></select>
+                                                    <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
+                                                </div>
+                                            </div>
+                                            <div class="grid grid-cols-1 sm:grid-cols-[10rem_minmax(0,1fr)] gap-4 flex-1 min-h-0">
+                                                <div id="chat-threads" class="hidden sm:block bg-white/5 border border-white/10 rounded-[2rem] p-3 h-full max-h-[520px] overflow-y-auto custom-scrollbar"></div>
+                                                <div class="flex flex-col bg-white/5 border border-white/10 rounded-[2rem] p-3 flex-1 min-h-0 sm:max-h-[520px]">
+                                                    <div id="chat-messages" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1"></div>
+                                                    <form id="chat-form" class="mt-3 flex items-center gap-2">
+                                                        <input id="chat-input" type="text" class="flex-1 bg-slate-950/50 border border-white/10 focus:border-accent rounded-2xl px-4 py-3 text-sm font-bold text-white outline-none" placeholder="Type a message">
+                                                        <button type="submit" class="h-12 px-5 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest">
+                                                            Send
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                            <p id="chat-hint" class="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                                <?php if (Auth::isAdmin()): ?>
+                                                    Admin can chat with everyone.
+                                                <?php elseif (Auth::isFinanceHead()): ?>
+                                                    Head Of Finance can chat with Finance Staff and Department Heads.
+                                                <?php elseif (Auth::isStaff() || Auth::isDepartmentHead()): ?>
+                                                    You can chat with Admin and Head Of Finance.
+                                                <?php else: ?>
+                                                    You can chat with Admin.
+                                                <?php endif; ?>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                         <a href="<?php echo BASE_URL; ?>/logout" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all border border-white/10">
                             <i class="fas fa-right-from-bracket text-sm"></i>
                         </a>
@@ -1184,79 +1257,6 @@
     >
         <i class="fas fa-arrow-up text-sm"></i>
     </button>
-    <?php if (!$isAuditor): ?>
-        <div id="support-chat-widget" class="fixed bottom-5 left-4 sm:bottom-6 sm:left-6 lg:bottom-8 lg:left-10 z-[118] relative">
-            <button type="button" id="support-chat-toggle" class="w-14 h-14 inline-flex items-center justify-center rounded-2xl bg-accent text-slate-900 shadow-xl shadow-yellow-500/20 hover-glow-yellow border border-accent/30 relative">
-                <i class="fas fa-comment-dots text-base"></i>
-                <span id="chat-unread-badge" class="hidden absolute -top-2 -right-2 min-w-[1.75rem] h-7 px-2 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center border border-white/20 shadow-xl"></span>
-            </button>
-            <div id="chat-toast" class="hidden absolute bottom-[4.25rem] left-0 w-[92vw] max-w-md">
-                <button type="button" id="chat-toast-btn" class="w-full glass-card rounded-[2rem] border-white/10 overflow-hidden shadow-2xl text-left">
-                    <div class="px-5 py-4 flex items-start gap-4">
-                        <div id="chat-toast-avatar" class="w-11 h-11 rounded-2xl overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center shrink-0"></div>
-                        <div class="min-w-0 flex-1">
-                            <p id="chat-toast-title" class="text-[10px] font-black uppercase tracking-[0.26em] text-accent">New Message</p>
-                            <p id="chat-toast-name" class="mt-1 text-sm font-black text-slate-200 truncate"></p>
-                            <p id="chat-toast-preview" class="mt-2 text-[11px] font-bold text-slate-400 truncate"></p>
-                        </div>
-                        <div class="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 shrink-0">
-                            <i class="fas fa-arrow-right"></i>
-                        </div>
-                    </div>
-                </button>
-            </div>
-            <div id="support-chat-panel" class="hidden fixed bottom-[5.5rem] left-4 right-4 sm:left-6 sm:right-auto sm:w-[30rem] lg:w-[34rem] max-w-[92vw]">
-                <div class="glass-card rounded-[2.5rem] border-white/10 overflow-hidden shadow-2xl">
-                    <div class="px-6 py-5 bg-white/[0.03] border-b border-white/10 flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <p class="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Assistant</p>
-                            <h3 class="text-lg font-black text-white truncate">Messages</h3>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button type="button" id="chat-desktop-notify-toggle" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10">
-                                <i class="fas fa-bell text-sm"></i>
-                            </button>
-                            <button type="button" id="support-chat-close" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10">
-                                <i class="fas fa-times text-sm"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="support-pane-chat" class="p-6 space-y-4">
-                        <div id="chat-admin-mobile" class="hidden sm:hidden bg-white/5 border border-white/10 rounded-[2rem] px-4 py-4">
-                            <label class="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2">Chat With</label>
-                            <div class="relative">
-                                <select id="chat-contact-select" class="w-full bg-slate-950/40 border border-white/10 focus:border-accent rounded-2xl pl-4 pr-10 py-3 text-[11px] font-black text-slate-200 outline-none appearance-none"></select>
-                                <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-[10rem_minmax(0,1fr)] gap-4">
-                            <div id="chat-threads" class="hidden sm:block bg-white/5 border border-white/10 rounded-[2rem] p-3 h-[60vh] max-h-[520px] overflow-y-auto custom-scrollbar"></div>
-                            <div class="flex flex-col bg-white/5 border border-white/10 rounded-[2rem] p-3 h-[60vh] max-h-[520px]">
-                                <div id="chat-messages" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1"></div>
-                                <form id="chat-form" class="mt-3 flex items-center gap-2">
-                                    <input id="chat-input" type="text" class="flex-1 bg-slate-950/50 border border-white/10 focus:border-accent rounded-2xl px-4 py-3 text-sm font-bold text-white outline-none" placeholder="Type a message">
-                                    <button type="submit" class="h-12 px-5 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest">
-                                        Send
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                        <p id="chat-hint" class="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                            <?php if (Auth::isAdmin()): ?>
-                                Admin can chat with everyone.
-                            <?php elseif (Auth::isFinanceHead()): ?>
-                                Head Of Finance can chat with Finance Staff and Department Heads.
-                            <?php elseif (Auth::isStaff() || Auth::isDepartmentHead()): ?>
-                                You can chat with Admin and Head Of Finance.
-                            <?php else: ?>
-                                You can chat with Admin.
-                            <?php endif; ?>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
     <?php if ($isFinanceHead): ?>
         <div id="finance-approvals-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-[120] hidden items-center justify-center p-4">
             <div id="finance-approvals-modal-content" class="glass-card w-full max-w-xl rounded-[3.5rem] overflow-hidden shadow-2xl transform transition-all duration-500 scale-95 opacity-0 border-white/10 max-h-[90vh] flex flex-col">

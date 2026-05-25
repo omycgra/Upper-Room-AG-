@@ -6,6 +6,45 @@
     </div>
 </div>
 
+<?php $adminResetLink = $isAdmin ? (string)Session::flash('admin_reset_link') : ''; ?>
+<?php $adminResetTarget = $isAdmin ? (string)Session::flash('admin_reset_target') : ''; ?>
+<?php if ($isAdmin && $adminResetLink !== ''): ?>
+    <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction mb-8">
+        <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex items-center gap-4 bg-white/[0.02]">
+            <div class="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center border border-accent/20">
+                <i class="fas fa-link text-accent text-sm"></i>
+            </div>
+            <div class="min-w-0">
+                <h4 class="text-xl font-black text-white tracking-tight">Password Reset Link</h4>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1 truncate"><?php echo $adminResetTarget !== '' ? htmlspecialchars($adminResetTarget) : 'Send this link to the user'; ?></p>
+            </div>
+        </div>
+        <div class="p-6 sm:p-8 lg:p-10">
+            <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <input id="admin-reset-link" type="text" readonly value="<?php echo htmlspecialchars($adminResetLink); ?>" class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-xs font-black text-slate-200 outline-none">
+                <button type="button" id="admin-reset-link-copy" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow">
+                    Copy
+                </button>
+            </div>
+            <p class="mt-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">This link expires in 30 minutes.</p>
+        </div>
+    </div>
+    <script>
+        (function () {
+            const input = document.getElementById('admin-reset-link');
+            const btn = document.getElementById('admin-reset-link-copy');
+            if (!input || !btn) return;
+            btn.addEventListener('click', async () => {
+                try {
+                    input.focus();
+                    input.select();
+                    document.execCommand('copy');
+                } catch (e) {}
+            });
+        })();
+    </script>
+<?php endif; ?>
+
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
     <!-- User Management Section -->
     <div class="xl:col-span-2 space-y-8">
@@ -35,6 +74,9 @@
                                 <div class="min-w-0">
                                     <p class="text-sm font-black text-slate-200 truncate"><?php echo $user['name']; ?></p>
                                     <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 break-all"><?php echo $user['email']; ?></p>
+                                    <?php if (!empty($user['username'])): ?>
+                                        <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1 break-all">@<?php echo htmlspecialchars((string)$user['username']); ?></p>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <span class="px-3 py-1.5 text-[9px] font-black rounded-full uppercase tracking-widest border shrink-0 <?php echo $user['role'] === 'admin' ? 'bg-accent/10 text-accent border-accent/20 shadow-[0_0_15px_rgba(251,191,36,0.1)]' : 'bg-white/5 text-slate-400 border-white/10'; ?>">
@@ -56,6 +98,15 @@
                                             data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
                                             class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
                                             <i class="fas fa-key text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Reset Password</span>
+                                        </button>
+                                        <button type="button"
+                                            data-edit-username="1"
+                                            data-user-id="<?php echo (int)$user['id']; ?>"
+                                            data-user-name="<?php echo htmlspecialchars((string)$user['name']); ?>"
+                                            data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
+                                            data-user-username="<?php echo htmlspecialchars((string)($user['username'] ?? '')); ?>"
+                                            class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
+                                            <i class="fas fa-at text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Edit Username</span>
                                         </button>
                                         <a href="settings/user/delete?id=<?php echo $user['id']; ?>" 
                                            onclick="return confirm('Security Check: Permanent deletion of this account?')"
@@ -79,6 +130,7 @@
                         <tr class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] border-b border-white/5 bg-white/[0.01]">
                             <th class="px-10 py-6">Admin Profile</th>
                             <th class="px-10 py-6">Privileges</th>
+                            <th class="px-10 py-6">Username</th>
                             <th class="px-10 py-6">Last Login</th>
                             <th class="px-10 py-6 text-right">Actions</th>
                         </tr>
@@ -103,6 +155,9 @@
                                     </span>
                                 </td>
                                 <td class="px-10 py-6">
+                                    <div class="text-xs font-black text-slate-300"><?php echo !empty($user['username']) ? '@' . htmlspecialchars((string)$user['username']) : '<span class="text-slate-600">—</span>'; ?></div>
+                                </td>
+                                <td class="px-10 py-6">
                                     <div class="flex items-center text-xs font-bold text-slate-400">
                                         <i class="far fa-clock text-[10px] text-accent/40 mr-3"></i>
                                         <?php echo $user['last_login'] ? date('M d, H:i', strtotime($user['last_login'])) : 'Never active'; ?>
@@ -119,6 +174,15 @@
                                                     data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
                                                     class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
                                                     <i class="fas fa-key text-xs"></i>
+                                                </button>
+                                                <button type="button"
+                                                    data-edit-username="1"
+                                                    data-user-id="<?php echo (int)$user['id']; ?>"
+                                                    data-user-name="<?php echo htmlspecialchars((string)$user['name']); ?>"
+                                                    data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
+                                                    data-user-username="<?php echo htmlspecialchars((string)($user['username'] ?? '')); ?>"
+                                                    class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
+                                                    <i class="fas fa-at text-xs"></i>
                                                 </button>
                                                 <a href="settings/user/delete?id=<?php echo $user['id']; ?>" 
                                                    onclick="return confirm('Security Check: Permanent deletion of this account?')"
@@ -139,6 +203,67 @@
                 </table>
             </div>
         </div>
+
+        <?php if ($isAdmin): ?>
+            <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
+                <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex items-center justify-between gap-4 bg-white/[0.02]">
+                    <div class="flex items-center min-w-0">
+                        <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
+                            <i class="fas fa-user-lock text-accent text-sm"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <h4 class="text-xl font-black text-white tracking-tight truncate">Password Reset Requests</h4>
+                            <p class="text-slate-500 font-black mt-2 uppercase tracking-widest text-[10px]">Approve before user can reset password</p>
+                        </div>
+                    </div>
+                    <span class="px-4 py-2 text-[9px] font-black rounded-full uppercase tracking-widest border bg-white/5 text-slate-300 border-white/10 shrink-0">
+                        <?php echo (int)count($passwordResetRequests ?? []); ?> Pending
+                    </span>
+                </div>
+
+                <div class="p-4 sm:p-6 lg:p-10 space-y-4">
+                    <?php if (empty($passwordResetRequests)): ?>
+                        <div class="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">No pending requests</p>
+                            <p class="mt-3 text-sm font-black text-slate-200">Everything is clear.</p>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach (($passwordResetRequests ?? []) as $r): ?>
+                            <div class="glass-card rounded-[2rem] p-5 sm:p-6 border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-black text-slate-200 truncate"><?php echo htmlspecialchars((string)($r['name'] ?? '')); ?></p>
+                                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 break-all"><?php echo htmlspecialchars((string)($r['email'] ?? '')); ?></p>
+                                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                                        <span class="px-3 py-1.5 text-[9px] font-black rounded-full uppercase tracking-widest border bg-white/5 text-slate-300 border-white/10">
+                                            Requested: <?php echo !empty($r['requested_at']) ? date('M d, H:i', strtotime((string)$r['requested_at'])) : '—'; ?>
+                                        </span>
+                                        <?php if (!empty($r['requested_login'])): ?>
+                                            <span class="px-3 py-1.5 text-[9px] font-black rounded-full uppercase tracking-widest border bg-white/5 text-slate-300 border-white/10 break-all">
+                                                Login: <?php echo htmlspecialchars((string)$r['requested_login']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                    <form action="<?php echo BASE_URL; ?>/settings/user/approvePasswordReset" method="POST" data-loader="top" class="w-full sm:w-auto">
+                                        <input type="hidden" name="request_id" value="<?php echo (int)($r['id'] ?? 0); ?>">
+                                        <button type="submit" class="w-full sm:w-auto h-11 px-5 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow">
+                                            Approve
+                                        </button>
+                                    </form>
+                                    <form action="<?php echo BASE_URL; ?>/settings/user/rejectPasswordReset" method="POST" data-loader="top" class="w-full sm:w-auto">
+                                        <input type="hidden" name="request_id" value="<?php echo (int)($r['id'] ?? 0); ?>">
+                                        <button type="submit" class="w-full sm:w-auto h-11 px-5 rounded-2xl bg-white/5 border border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/10">
+                                            Reject
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 
     <!-- Global Settings Sidebar -->
@@ -702,6 +827,34 @@
 <?php endif; ?>
 
 <?php if ($isAdmin): ?>
+<div id="edit-username-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-md rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center mb-10">
+            <div>
+                <h3 class="text-3xl font-black text-white tracking-tighter">Edit Username</h3>
+                <p id="edit-username-target" class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2"></p>
+            </div>
+            <button type="button" onclick="document.getElementById('edit-username-modal').classList.add('hidden')" class="w-10 h-10 bg-white/5 hover:bg-accent hover:text-slate-900 text-slate-400 rounded-xl flex items-center justify-center transition-all border border-white/10">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <form action="<?php echo BASE_URL; ?>/settings/user/updateUsername" method="POST" data-loader="top" class="space-y-8">
+            <input type="hidden" name="user_id" id="edit-username-user-id" value="">
+            <div class="space-y-3">
+                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Username</label>
+                <div class="relative group">
+                    <i class="fas fa-at absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                    <input type="text" name="username" id="edit-username-input" required class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-sm font-black text-white transition-all outline-none" placeholder="e.g. admin.urampong">
+                </div>
+                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Letters, numbers, dot, underscore, hyphen</p>
+            </div>
+            <button type="submit" class="w-full bg-accent text-slate-900 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                Update Username
+            </button>
+        </form>
+    </div>
+</div>
+
 <div id="reset-password-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4">
     <div class="glass-card w-full max-w-md rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center mb-10">
@@ -789,6 +942,38 @@
             const btn = e.target.closest('[data-reset-password="1"]');
             if (!btn) return;
             open(btn.dataset.userId, btn.dataset.userName, btn.dataset.userEmail);
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.add('hidden');
+        });
+    })();
+</script>
+<?php endif; ?>
+
+<?php if ($isAdmin): ?>
+<script>
+    (function () {
+        const modal = document.getElementById('edit-username-modal');
+        const userIdInput = document.getElementById('edit-username-user-id');
+        const input = document.getElementById('edit-username-input');
+        const label = document.getElementById('edit-username-target');
+        if (!modal || !userIdInput || !input || !label) return;
+
+        const open = (id, name, email, username) => {
+            userIdInput.value = String(id || '');
+            const safeName = (name || '').trim();
+            const safeEmail = (email || '').trim();
+            label.textContent = safeName !== '' ? `${safeName} • ${safeEmail}` : safeEmail;
+            input.value = (username || '').trim();
+            modal.classList.remove('hidden');
+            setTimeout(() => { try { input.focus(); input.select(); } catch (e) {} }, 50);
+        };
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-edit-username="1"]');
+            if (!btn) return;
+            open(btn.dataset.userId, btn.dataset.userName, btn.dataset.userEmail, btn.dataset.userUsername);
         });
 
         modal.addEventListener('click', (e) => {

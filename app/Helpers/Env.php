@@ -17,7 +17,7 @@ class Env
 
         foreach ($lines as $line) {
             $line = trim((string)$line);
-            if ($line === '' || str_starts_with($line, '#')) {
+            if ($line === '' || substr($line, 0, 1) === '#') {
                 continue;
             }
 
@@ -33,8 +33,8 @@ class Env
             }
 
             if (
-                (str_starts_with($value, '"') && str_ends_with($value, '"')) ||
-                (str_starts_with($value, "'") && str_ends_with($value, "'"))
+                (substr($value, 0, 1) === '"' && substr($value, -1) === '"') ||
+                (substr($value, 0, 1) === "'" && substr($value, -1) === "'")
             ) {
                 $value = substr($value, 1, -1);
             }

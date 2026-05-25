@@ -13,6 +13,19 @@ class SettingController extends BaseController {
         $db = Database::getInstance();
         $this->ensureUserSchema($db);
         $users = $db->fetchAll("SELECT * FROM users ORDER BY created_at DESC");
+        $passwordResetRequests = [];
+        if (Auth::isAdmin()) {
+            $this->ensurePasswordResetRequestSchema($db);
+            $passwordResetRequests = $db->fetchAll(
+                "SELECT r.id, r.user_id, r.requested_login, r.status, r.requested_at,
+                        u.name, u.email, u.username, u.role
+                 FROM password_reset_requests r
+                 INNER JOIN users u ON u.id = r.user_id
+                 WHERE r.status = 'pending'
+                 ORDER BY r.requested_at DESC, r.id DESC
+                 LIMIT 50"
+            ) ?: [];
+        }
         $deptModel = new Department();
         $departments = $deptModel->all('name ASC');
         $churchName = AppConfig::getSetting('church_name', 'Church Management');
@@ -64,7 +77,8 @@ class SettingController extends BaseController {
             'smsTwilioAuthToken' => $smsTwilioAuthToken,
             'smsTwilioFrom' => $smsTwilioFrom,
             'dbConfig' => $dbConfig,
-            'me' => $me
+            'me' => $me,
+            'passwordResetRequests' => $passwordResetRequests
         ]);
     }
 
@@ -232,6 +246,136 @@ class SettingController extends BaseController {
             Session::flash('success', 'Password updated successfully.');
         } catch (Exception $e) {
             Session::flash('error', 'Error updating password: ' . $e->getMessage());
+        }
+
+        $this->redirectSettings();
+    }
+
+    public function updateUserUsername() {
+        $this->isAdmin();
+
+        $db = Database::getInstance();
+        $this->ensureUserSchema($db);
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $username = trim((string)($_POST['username'] ?? ''));
+
+        if ($userId <= 0) {
+            Session::flash('error', 'Invalid user selected.');
+            $this->redirectSettings();
+        }
+
+        if ($username === '' || strlen($username) < 3) {
+            Session::flash('error', 'Username must be at least 3 characters.');
+            $this->redirectSettings();
+        }
+
+        if (strlen($username) > 60) {
+            Session::flash('error', 'Username is too long.');
+            $this->redirectSettings();
+        }
+
+        if (!preg_match('/^[a-zA-Z0-9._-]+$/', $username)) {
+            Session::flash('error', 'Username can only contain letters, numbers, dot, underscore, and hyphen.');
+            $this->redirectSettings();
+        }
+
+        $user = $db->fetch("SELECT id, email, username FROM users WHERE id = ? LIMIT 1", [$userId]);
+        if (!$user) {
+            Session::flash('error', 'User not found.');
+            $this->redirectSettings();
+        }
+
+        $existing = $db->fetch("SELECT id FROM users WHERE username = ? AND id <> ? LIMIT 1", [$username, $userId]);
+        if ($existing) {
+            Session::flash('error', 'Username is already taken.');
+            $this->redirectSettings();
+        }
+
+        try {
+            $db->query("UPDATE users SET username = ? WHERE id = ?", [$username, $userId]);
+            AuditLog::log("Updated username for user: " . ($user['email'] ?? 'Unknown'), "users", $userId);
+            Session::flash('success', 'Username updated successfully.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to update username: ' . $e->getMessage());
+        }
+
+        $this->redirectSettings();
+    }
+
+    public function approvePasswordReset() {
+        $this->isAdmin();
+
+        $db = Database::getInstance();
+        $this->ensureUserSchema($db);
+        $this->ensurePasswordResetRequestSchema($db);
+
+        $requestId = (int)($_POST['request_id'] ?? 0);
+        if ($requestId <= 0) {
+            Session::flash('error', 'Invalid reset request.');
+            $this->redirectSettings();
+        }
+
+        $req = $db->fetch(
+            "SELECT r.id, r.user_id, r.requested_login, r.status, u.email
+             FROM password_reset_requests r
+             INNER JOIN users u ON u.id = r.user_id
+             WHERE r.id = ? LIMIT 1",
+            [$requestId]
+        );
+        if (!$req || strtolower((string)($req['status'] ?? '')) !== 'pending') {
+            Session::flash('error', 'Reset request is not pending.');
+            $this->redirectSettings();
+        }
+
+        $token = bin2hex(random_bytes(20));
+        $tokenHash = hash('sha256', $token);
+        $expiresAt = date('Y-m-d H:i:s', time() + 30 * 60);
+
+        try {
+            $db->query("UPDATE users SET reset_token_hash = ?, reset_token_expires_at = ? WHERE id = ?", [$tokenHash, $expiresAt, (int)$req['user_id']]);
+            $db->query(
+                "UPDATE password_reset_requests
+                 SET status = 'approved', approved_by = ?, approved_at = NOW(), token_hash = ?, token_expires_at = ?
+                 WHERE id = ?",
+                [(int)Session::get('user_id'), $tokenHash, $expiresAt, $requestId]
+            );
+
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            $resetLink = $base . '/reset-password?token=' . urlencode($token);
+            Session::flash('admin_reset_link', $resetLink);
+            Session::flash('admin_reset_target', (string)($req['email'] ?? ''));
+            AuditLog::log("Approved password reset request for user: " . ($req['email'] ?? 'Unknown'), "password_reset_requests", $requestId);
+            Session::flash('success', 'Reset approved. Copy the reset link below and send it to the user.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to approve reset: ' . $e->getMessage());
+        }
+
+        $this->redirectSettings();
+    }
+
+    public function rejectPasswordReset() {
+        $this->isAdmin();
+
+        $db = Database::getInstance();
+        $this->ensurePasswordResetRequestSchema($db);
+
+        $requestId = (int)($_POST['request_id'] ?? 0);
+        if ($requestId <= 0) {
+            Session::flash('error', 'Invalid reset request.');
+            $this->redirectSettings();
+        }
+
+        try {
+            $db->query(
+                "UPDATE password_reset_requests
+                 SET status = 'rejected', approved_by = ?, approved_at = NOW()
+                 WHERE id = ? AND status = 'pending'",
+                [(int)Session::get('user_id'), $requestId]
+            );
+            Session::flash('success', 'Reset request rejected.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to reject reset request: ' . $e->getMessage());
         }
 
         $this->redirectSettings();
@@ -498,6 +642,51 @@ class SettingController extends BaseController {
             if (!$db->columnExists('users', 'department_id')) {
                 $db->query("ALTER TABLE users ADD COLUMN department_id INT NULL");
             }
+        });
+    }
+
+    private function ensurePasswordResetRequestSchema($db) {
+        SchemaState::once('password_reset_requests_schema', function () use ($db) {
+            if ($db->tableExists('password_reset_requests')) {
+                return;
+            }
+
+            if ($db->isPgsql()) {
+                $db->rawExec(
+                    "CREATE TABLE IF NOT EXISTS public.password_reset_requests (
+                        id integer generated by default as identity primary key,
+                        user_id integer not null references public.users(id) on delete cascade,
+                        requested_login varchar(100) null,
+                        status varchar(20) not null default 'pending',
+                        requested_at timestamptz not null default timezone('utc', now()),
+                        approved_by integer null references public.users(id) on delete set null,
+                        approved_at timestamptz null,
+                        token_hash varchar(64) null,
+                        token_expires_at timestamptz null,
+                        consumed_at timestamptz null
+                    )"
+                );
+                $db->rawExec("CREATE INDEX IF NOT EXISTS idx_prr_status ON public.password_reset_requests (status)");
+                $db->rawExec("CREATE INDEX IF NOT EXISTS idx_prr_user ON public.password_reset_requests (user_id)");
+                return;
+            }
+
+            $db->rawExec(
+                "CREATE TABLE IF NOT EXISTS password_reset_requests (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    requested_login VARCHAR(100) NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    approved_by INT NULL,
+                    approved_at DATETIME NULL,
+                    token_hash VARCHAR(64) NULL,
+                    token_expires_at DATETIME NULL,
+                    consumed_at DATETIME NULL,
+                    INDEX idx_prr_status (status),
+                    INDEX idx_prr_user (user_id)
+                )"
+            );
         });
     }
 

@@ -71,6 +71,9 @@ class Router {
         $this->add('settings/user/add', 'SettingController@addUser');
         $this->add('settings/user/delete', 'SettingController@deleteUser');
         $this->add('settings/user/resetPassword', 'SettingController@resetUserPassword');
+        $this->add('settings/user/updateUsername', 'SettingController@updateUserUsername');
+        $this->add('settings/user/approvePasswordReset', 'SettingController@approvePasswordReset');
+        $this->add('settings/user/rejectPasswordReset', 'SettingController@rejectPasswordReset');
         $this->add('cluster', 'ClusterController@index');
         $this->add('cluster/store', 'ClusterController@store');
         $this->add('cluster/update', 'ClusterController@update');

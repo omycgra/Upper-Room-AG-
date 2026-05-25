@@ -70,15 +70,10 @@ class AuthController {
             $login = $_POST['login'] ?? '';
             $result = Auth::requestPasswordReset($login);
             if (!empty($result['success'])) {
-                $token = $result['token'] ?? '';
-                $resetLink = $base . '/reset-password?token=' . urlencode($token);
-                Session::flash('success', 'Password reset link generated.');
-                Session::flash('reset_link', $resetLink);
-                header("Location: $base/forgot-password");
-                exit;
+                Session::flash('success', 'Reset request submitted. Please contact the admin to approve it.');
+            } else {
+                Session::flash('error', 'Account not found. Enter your username or email.');
             }
-
-            Session::flash('error', 'Account not found. Enter your username or email.');
             header("Location: $base/forgot-password");
             exit;
         }

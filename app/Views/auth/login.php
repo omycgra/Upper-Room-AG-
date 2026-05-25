@@ -950,7 +950,7 @@
     <div class="page-shell">
         <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,520px)] lg:gap-8">
             <section class="brand-panel rounded-[2.4rem] p-6 sm:p-8 lg:p-10">
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div class="inline-flex items-center gap-4">
                         <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white/10 backdrop-blur-md rounded-[1.6rem] border border-white/20 shadow-xl overflow-hidden shrink-0">
                             <?php if ($logoRelativePath): ?>
@@ -964,9 +964,9 @@
                             <h1 class="mt-3 text-2xl sm:text-3xl lg:text-[2.5rem] font-black text-white tracking-tight uppercase leading-tight"><?php echo $churchName; ?></h1>
                         </div>
                     </div>
-                    <div class="hidden sm:flex items-center gap-3">
-                        <div class="relative">
-                            <select id="login-theme-switch" class="h-10 rounded-2xl bg-white/5 border border-white/10 px-4 pr-9 text-[10px] font-black uppercase tracking-[0.24em] text-slate-200 outline-none appearance-none cursor-pointer">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+                        <div class="relative w-full sm:w-auto">
+                            <select id="login-theme-switch" class="w-full sm:w-auto h-11 sm:h-10 rounded-2xl bg-white/5 border border-white/10 px-4 pr-9 text-[10px] font-black uppercase tracking-[0.24em] text-slate-200 outline-none appearance-none cursor-pointer">
                                 <option value="dark">Dark</option>
                                 <option value="light">Light</option>
                                 <option value="ocean">Ocean</option>
@@ -974,7 +974,7 @@
                             </select>
                             <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
                         </div>
-                        <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-slate-300">
+                        <span class="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-slate-300 w-full sm:w-auto">
                             Upper Room
                         </span>
                     </div>
