@@ -13,6 +13,19 @@ class SettingController extends BaseController {
         $db = Database::getInstance();
         $this->ensureUserSchema($db);
         $users = $db->fetchAll("SELECT * FROM users ORDER BY created_at DESC");
+        $activeUsers = [];
+        $activeCutoffSeconds = 10 * 60;
+        $nowTs = time();
+        foreach (($users ?: []) as $u) {
+            $lastActivity = (string)($u['last_activity_at'] ?? '');
+            if ($lastActivity === '') {
+                continue;
+            }
+            $ts = strtotime($lastActivity);
+            if ($ts !== false && ($nowTs - $ts) <= $activeCutoffSeconds) {
+                $activeUsers[] = $u;
+            }
+        }
         $passwordResetRequests = [];
         if (Auth::isAdmin()) {
             $this->ensurePasswordResetRequestSchema($db);
@@ -78,6 +91,7 @@ class SettingController extends BaseController {
             'smsTwilioFrom' => $smsTwilioFrom,
             'dbConfig' => $dbConfig,
             'me' => $me,
+            'activeUsers' => $activeUsers,
             'passwordResetRequests' => $passwordResetRequests
         ]);
     }
@@ -298,6 +312,69 @@ class SettingController extends BaseController {
             Session::flash('success', 'Username updated successfully.');
         } catch (Throwable $e) {
             Session::flash('error', 'Failed to update username: ' . $e->getMessage());
+        }
+
+        $this->redirectSettings();
+    }
+
+    public function updateUserRole() {
+        $this->isAdmin();
+
+        $db = Database::getInstance();
+        $this->ensureUserSchema($db);
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $role = strtolower(trim((string)($_POST['role'] ?? '')));
+        $departmentId = (int)($_POST['department_id'] ?? 0);
+
+        if ($userId <= 0) {
+            Session::flash('error', 'Invalid user selected.');
+            $this->redirectSettings();
+        }
+
+        if ($userId === (int)Session::get('user_id')) {
+            Session::flash('error', 'You cannot change your own permission level.');
+            $this->redirectSettings();
+        }
+
+        $allowedRoles = [
+            'finance_staff',
+            'finance_head',
+            'dept_head',
+            'visitation_team',
+            'auditor',
+            'pastor',
+            'admin'
+        ];
+        if (!in_array($role, $allowedRoles, true)) {
+            Session::flash('error', 'Invalid permission level.');
+            $this->redirectSettings();
+        }
+
+        if (in_array($role, ['dept_head', 'visitation_team'], true)) {
+            if ($departmentId <= 0) {
+                Session::flash('error', 'Department is required for this permission level.');
+                $this->redirectSettings();
+            }
+        } else {
+            $departmentId = 0;
+        }
+
+        $user = $db->fetch("SELECT id, email, role FROM users WHERE id = ? LIMIT 1", [$userId]);
+        if (!$user) {
+            Session::flash('error', 'User not found.');
+            $this->redirectSettings();
+        }
+
+        try {
+            $db->query(
+                "UPDATE users SET role = ?, department_id = ? WHERE id = ?",
+                [$role, $departmentId > 0 ? $departmentId : null, $userId]
+            );
+            AuditLog::log("Updated permission level for user: " . ($user['email'] ?? 'Unknown'), "users", $userId);
+            Session::flash('success', 'Permission level updated successfully.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to update permission level: ' . $e->getMessage());
         }
 
         $this->redirectSettings();
@@ -641,6 +718,10 @@ class SettingController extends BaseController {
 
             if (!$db->columnExists('users', 'department_id')) {
                 $db->query("ALTER TABLE users ADD COLUMN department_id INT NULL");
+            }
+
+            if (!$db->columnExists('users', 'last_activity_at')) {
+                $db->query("ALTER TABLE users ADD COLUMN last_activity_at " . ($db->isPgsql() ? 'TIMESTAMP' : 'DATETIME') . " NULL");
             }
         });
     }

@@ -117,56 +117,30 @@ class ChatController extends BaseController {
                     u.name,
                     u.photo_path,
                     t.id as thread_id,
-                    t.last_message_at,
-                    COALESCE((
-                        SELECT COUNT(*)
-                        FROM chat_messages um
-                        WHERE um.thread_id = t.id
-                          AND um.sender_id <> ?
-                          AND um.read_at IS NULL
-                    ), 0) AS unread_count,
-                    COALESCE((
-                        SELECT lm.id
-                        FROM chat_messages lm
-                        WHERE lm.thread_id = t.id
-                        ORDER BY lm.id DESC
-                        LIMIT 1
-                    ), 0) AS last_message_id,
-                    COALESCE((
-                        SELECT lm.sender_id
-                        FROM chat_messages lm
-                        WHERE lm.thread_id = t.id
-                        ORDER BY lm.id DESC
-                        LIMIT 1
-                    ), 0) AS last_sender_id,
-                    COALESCE((
-                        SELECT lm.message
-                        FROM chat_messages lm
-                        WHERE lm.thread_id = t.id
-                        ORDER BY lm.id DESC
-                        LIMIT 1
-                    ), '') AS last_message
+                    t.last_message_at
                  FROM users u
                  LEFT JOIN chat_threads t
                     ON (t.user_a = ? AND t.user_b = u.id) OR (t.user_a = u.id AND t.user_b = ?)
                  WHERE u.id <> ?
                    $roleFilterSql
                  ORDER BY COALESCE(t.last_message_at, t.created_at) DESC, u.name ASC",
-                [$me, $me, $me, $me]
+                [$me, $me, $me]
             ) ?: [];
 
             $threads = [];
             foreach ($rows as $r) {
+                $threadId = (int)($r['thread_id'] ?? 0);
+                $meta = $threadId > 0 ? $this->getThreadMeta($db, $threadId, $me) : $this->emptyThreadMeta();
                 $threads[] = [
-                    'thread_id' => (int)($r['thread_id'] ?? 0),
+                    'thread_id' => $threadId,
                     'user_id' => (int)($r['user_id'] ?? 0),
                     'name' => (string)($r['name'] ?? ''),
                     'photo_path' => (string)($r['photo_path'] ?? ''),
                     'last_message_at' => (string)($r['last_message_at'] ?? ''),
-                    'unread_count' => (int)($r['unread_count'] ?? 0),
-                    'last_message_id' => (int)($r['last_message_id'] ?? 0),
-                    'last_sender_id' => (int)($r['last_sender_id'] ?? 0),
-                    'last_message' => (string)($r['last_message'] ?? '')
+                    'unread_count' => (int)($meta['unread_count'] ?? 0),
+                    'last_message_id' => (int)($meta['last_message_id'] ?? 0),
+                    'last_sender_id' => (int)($meta['last_sender_id'] ?? 0),
+                    'last_message' => (string)($meta['last_message'] ?? '')
                 ];
             }
 
@@ -180,35 +154,7 @@ class ChatController extends BaseController {
                     u.name,
                     u.photo_path,
                     t.id as thread_id,
-                    t.last_message_at,
-                    COALESCE((
-                        SELECT COUNT(*)
-                        FROM chat_messages um
-                        WHERE um.thread_id = t.id
-                          AND um.sender_id <> ?
-                          AND um.read_at IS NULL
-                    ), 0) AS unread_count,
-                    COALESCE((
-                        SELECT lm.id
-                        FROM chat_messages lm
-                        WHERE lm.thread_id = t.id
-                        ORDER BY lm.id DESC
-                        LIMIT 1
-                    ), 0) AS last_message_id,
-                    COALESCE((
-                        SELECT lm.sender_id
-                        FROM chat_messages lm
-                        WHERE lm.thread_id = t.id
-                        ORDER BY lm.id DESC
-                        LIMIT 1
-                    ), 0) AS last_sender_id,
-                    COALESCE((
-                        SELECT lm.message
-                        FROM chat_messages lm
-                        WHERE lm.thread_id = t.id
-                        ORDER BY lm.id DESC
-                        LIMIT 1
-                    ), '') AS last_message
+                    t.last_message_at
                  FROM users u
                  LEFT JOIN chat_threads t
                     ON (t.user_a = ? AND t.user_b = u.id) OR (t.user_a = u.id AND t.user_b = ?)
@@ -220,21 +166,23 @@ class ChatController extends BaseController {
                         'pastor','reverend','rev','minister'
                    )
                  ORDER BY COALESCE(t.last_message_at, t.created_at) DESC, u.name ASC",
-                [$me, $me, $me, $me]
+                [$me, $me, $me]
             ) ?: [];
 
             $threads = [];
             foreach ($rows as $r) {
+                $threadId = (int)($r['thread_id'] ?? 0);
+                $meta = $threadId > 0 ? $this->getThreadMeta($db, $threadId, $me) : $this->emptyThreadMeta();
                 $threads[] = [
-                    'thread_id' => (int)($r['thread_id'] ?? 0),
+                    'thread_id' => $threadId,
                     'user_id' => (int)($r['user_id'] ?? 0),
                     'name' => (string)($r['name'] ?? ''),
                     'photo_path' => (string)($r['photo_path'] ?? ''),
                     'last_message_at' => (string)($r['last_message_at'] ?? ''),
-                    'unread_count' => (int)($r['unread_count'] ?? 0),
-                    'last_message_id' => (int)($r['last_message_id'] ?? 0),
-                    'last_sender_id' => (int)($r['last_sender_id'] ?? 0),
-                    'last_message' => (string)($r['last_message'] ?? '')
+                    'unread_count' => (int)($meta['unread_count'] ?? 0),
+                    'last_message_id' => (int)($meta['last_message_id'] ?? 0),
+                    'last_sender_id' => (int)($meta['last_sender_id'] ?? 0),
+                    'last_message' => (string)($meta['last_message'] ?? '')
                 ];
             }
 
@@ -339,23 +287,49 @@ class ChatController extends BaseController {
         $limit = max(10, min(120, (int)($_GET['limit'] ?? 60)));
         $sinceId = (int)($_GET['since_id'] ?? 0);
 
+        $hideClause = '';
+        $hideParams = [];
+        if (!Auth::isAdmin()) {
+            $notDeletedBySender = $db->isPgsql()
+                ? "COALESCE(m.deleted_by_sender, FALSE) = FALSE"
+                : "COALESCE(m.deleted_by_sender, 0) = 0";
+            $notDeletedByRecipient = $db->isPgsql()
+                ? "COALESCE(m.deleted_by_recipient, FALSE) = FALSE"
+                : "COALESCE(m.deleted_by_recipient, 0) = 0";
+            $hideClause = " AND (
+                (m.sender_id = ? AND $notDeletedBySender)
+                OR
+                (m.sender_id <> ? AND $notDeletedByRecipient)
+            )";
+            $hideParams = [$me, $me];
+        }
+
+        $deletedForAllExpr = $db->isPgsql()
+            ? "COALESCE(m.deleted_for_all, FALSE)"
+            : "COALESCE(m.deleted_for_all, 0) = 1";
+        $deletedForAllSelect = $db->isPgsql()
+            ? "COALESCE(m.deleted_for_all, FALSE) AS deleted_for_all"
+            : "COALESCE(m.deleted_for_all, 0) AS deleted_for_all";
+
         if ($sinceId > 0) {
             $rows = $db->fetchAll(
                 "SELECT
                     m.id,
                     m.thread_id,
                     m.sender_id,
-                    m.message,
+                    CASE WHEN $deletedForAllExpr THEN '' ELSE m.message END AS message,
                     m.created_at,
+                    $deletedForAllSelect,
                     u.name as sender_name,
                     u.photo_path as sender_photo
                  FROM chat_messages m
                  INNER JOIN users u ON u.id = m.sender_id
                  WHERE m.thread_id = ?
                    AND m.id > ?
+                   $hideClause
                  ORDER BY m.id ASC
                  LIMIT $limit",
-                [$threadId, $sinceId]
+                array_merge([$threadId, $sinceId], $hideParams)
             ) ?: [];
         } else {
             $rows = $db->fetchAll(
@@ -363,16 +337,18 @@ class ChatController extends BaseController {
                     m.id,
                     m.thread_id,
                     m.sender_id,
-                    m.message,
+                    CASE WHEN $deletedForAllExpr THEN '' ELSE m.message END AS message,
                     m.created_at,
+                    $deletedForAllSelect,
                     u.name as sender_name,
                     u.photo_path as sender_photo
                  FROM chat_messages m
                  INNER JOIN users u ON u.id = m.sender_id
                  WHERE m.thread_id = ?
+                   $hideClause
                  ORDER BY m.id DESC
                  LIMIT $limit",
-                [$threadId]
+                array_merge([$threadId], $hideParams)
             ) ?: [];
             $rows = array_reverse($rows);
         }
@@ -401,6 +377,7 @@ class ChatController extends BaseController {
                 'sender_name' => (string)($r['sender_name'] ?? ''),
                 'sender_photo' => (string)($r['sender_photo'] ?? ''),
                 'message' => (string)($r['message'] ?? ''),
+                'deleted_for_all' => $this->isTruthy($r['deleted_for_all'] ?? null),
                 'created_at' => (string)($r['created_at'] ?? '')
             ];
         }
@@ -496,6 +473,80 @@ class ChatController extends BaseController {
         $this->jsonResponse(['success' => true, 'thread_id' => $threadId, 'message_id' => $messageId]);
     }
 
+    public function deleteMessage() {
+        if (Auth::isAuditor()) {
+            $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
+        }
+
+        $db = Database::getInstance();
+        $this->ensureChatSchema($db);
+
+        $me = (int)Session::get('user_id');
+        if ($me <= 0) {
+            $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
+        }
+
+        $messageId = (int)($_POST['message_id'] ?? 0);
+        $mode = strtolower(trim((string)($_POST['mode'] ?? 'me')));
+        if ($messageId <= 0) {
+            $this->jsonResponse(['success' => false, 'message' => 'Invalid message.'], 400);
+        }
+        if (!in_array($mode, ['me', 'all'], true)) {
+            $this->jsonResponse(['success' => false, 'message' => 'Invalid delete mode.'], 400);
+        }
+
+        $msg = $db->fetch("SELECT id, thread_id, sender_id, created_at, deleted_for_all FROM chat_messages WHERE id = ? LIMIT 1", [$messageId]);
+        if (!$msg) {
+            $this->jsonResponse(['success' => false, 'message' => 'Message not found.'], 404);
+        }
+
+        $threadId = (int)($msg['thread_id'] ?? 0);
+        $thread = $threadId > 0 ? $db->fetch("SELECT * FROM chat_threads WHERE id = ? LIMIT 1", [$threadId]) : null;
+        if (!$thread) {
+            $this->jsonResponse(['success' => false, 'message' => 'Thread not found.'], 404);
+        }
+
+        $a = (int)($thread['user_a'] ?? 0);
+        $b = (int)($thread['user_b'] ?? 0);
+        $isParticipant = ($me === $a || $me === $b);
+        $isAdmin = Auth::isAdmin();
+        if (!$isParticipant && !$isAdmin) {
+            $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
+        }
+
+        $senderId = (int)($msg['sender_id'] ?? 0);
+        $nowExpr = $db->isPgsql() ? 'CURRENT_TIMESTAMP' : 'NOW()';
+        $trueLit = $db->isPgsql() ? 'TRUE' : '1';
+
+        if ($mode === 'all') {
+            if (!$isAdmin && $senderId !== $me) {
+                $this->jsonResponse(['success' => false, 'message' => 'Only the sender can delete for everyone.'], 403);
+            }
+            try {
+                $db->query("UPDATE chat_messages SET deleted_for_all = $trueLit, deleted_at = $nowExpr WHERE id = ?", [$messageId]);
+            } catch (Throwable $e) {
+                $this->jsonResponse(['success' => false, 'message' => 'Failed to delete message.'], 500);
+            }
+            $this->jsonResponse(['success' => true, 'mode' => 'all', 'message_id' => $messageId]);
+        }
+
+        if (!$isParticipant) {
+            $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
+        }
+
+        try {
+            if ($senderId === $me) {
+                $db->query("UPDATE chat_messages SET deleted_by_sender = $trueLit WHERE id = ?", [$messageId]);
+            } else {
+                $db->query("UPDATE chat_messages SET deleted_by_recipient = $trueLit WHERE id = ?", [$messageId]);
+            }
+        } catch (Throwable $e) {
+            $this->jsonResponse(['success' => false, 'message' => 'Failed to delete message.'], 500);
+        }
+
+        $this->jsonResponse(['success' => true, 'mode' => 'me', 'message_id' => $messageId]);
+    }
+
     private function ensureChatSchema($db) {
         SchemaState::once('chat_schema_v1', function () use ($db) {
             if (!$db->tableExists('chat_threads')) {
@@ -562,6 +613,23 @@ class ChatController extends BaseController {
                 }
             }
         });
+
+        SchemaState::once('chat_schema_v2', function () use ($db) {
+            if ($db->tableExists('chat_messages')) {
+                if (!$db->columnExists('chat_messages', 'deleted_for_all')) {
+                    $db->query("ALTER TABLE chat_messages ADD COLUMN deleted_for_all " . ($db->isPgsql() ? 'BOOLEAN NOT NULL DEFAULT FALSE' : 'TINYINT(1) NOT NULL DEFAULT 0'));
+                }
+                if (!$db->columnExists('chat_messages', 'deleted_by_sender')) {
+                    $db->query("ALTER TABLE chat_messages ADD COLUMN deleted_by_sender " . ($db->isPgsql() ? 'BOOLEAN NOT NULL DEFAULT FALSE' : 'TINYINT(1) NOT NULL DEFAULT 0'));
+                }
+                if (!$db->columnExists('chat_messages', 'deleted_by_recipient')) {
+                    $db->query("ALTER TABLE chat_messages ADD COLUMN deleted_by_recipient " . ($db->isPgsql() ? 'BOOLEAN NOT NULL DEFAULT FALSE' : 'TINYINT(1) NOT NULL DEFAULT 0'));
+                }
+                if (!$db->columnExists('chat_messages', 'deleted_at')) {
+                    $db->query("ALTER TABLE chat_messages ADD COLUMN deleted_at " . ($db->isPgsql() ? 'TIMESTAMP' : 'DATETIME') . " NULL");
+                }
+            }
+        });
     }
 
     private function getOrCreateThread($db, int $u1, int $u2) {
@@ -615,28 +683,53 @@ class ChatController extends BaseController {
         $me = (int)$me;
         if ($threadId <= 0 || $me <= 0) return $meta;
 
+        $notDeletedBySender = $db->isPgsql()
+            ? "COALESCE(deleted_by_sender, FALSE) = FALSE"
+            : "COALESCE(deleted_by_sender, 0) = 0";
+        $notDeletedByRecipient = $db->isPgsql()
+            ? "COALESCE(deleted_by_recipient, FALSE) = FALSE"
+            : "COALESCE(deleted_by_recipient, 0) = 0";
+        $notDeletedForAll = $db->isPgsql()
+            ? "COALESCE(deleted_for_all, FALSE) = FALSE"
+            : "COALESCE(deleted_for_all, 0) = 0";
+
         $metaRow = $db->fetch(
             "SELECT
-                COALESCE(SUM(CASE WHEN sender_id <> ? AND read_at IS NULL THEN 1 ELSE 0 END), 0) AS unread_count,
-                COALESCE(MAX(id), 0) AS last_message_id
+                COALESCE(SUM(CASE WHEN sender_id <> ? AND read_at IS NULL AND $notDeletedForAll AND $notDeletedByRecipient THEN 1 ELSE 0 END), 0) AS unread_count,
+                COALESCE(MAX(CASE WHEN ((sender_id = ? AND $notDeletedBySender) OR (sender_id <> ? AND $notDeletedByRecipient)) THEN id ELSE NULL END), 0) AS last_message_id
              FROM chat_messages
              WHERE thread_id = ?",
-            [$me, $threadId]
+            [$me, $me, $me, $threadId]
         );
         $meta['unread_count'] = (int)($metaRow['unread_count'] ?? 0);
         $meta['last_message_id'] = (int)($metaRow['last_message_id'] ?? 0);
         if ($meta['last_message_id'] > 0) {
+            $deletedSelect = $db->isPgsql()
+                ? "COALESCE(deleted_for_all, FALSE) AS deleted_for_all"
+                : "COALESCE(deleted_for_all, 0) AS deleted_for_all";
+            $deletedExpr = $db->isPgsql()
+                ? "COALESCE(deleted_for_all, FALSE)"
+                : "COALESCE(deleted_for_all, 0) = 1";
             $lastRow = $db->fetch(
-                "SELECT sender_id, message
+                "SELECT sender_id,
+                        CASE WHEN $deletedExpr THEN '' ELSE message END AS message,
+                        $deletedSelect
                  FROM chat_messages
                  WHERE id = ?
                  LIMIT 1",
                 [$meta['last_message_id']]
             );
             $meta['last_sender_id'] = (int)($lastRow['sender_id'] ?? 0);
-            $meta['last_message'] = (string)($lastRow['message'] ?? '');
+            $isDeletedAll = $this->isTruthy($lastRow['deleted_for_all'] ?? null);
+            $meta['last_message'] = $isDeletedAll ? 'Message deleted' : (string)($lastRow['message'] ?? '');
         }
         return $meta;
+    }
+
+    private function isTruthy($v): bool {
+        if (is_bool($v)) return $v;
+        $s = strtolower(trim((string)$v));
+        return in_array($s, ['1', 'true', 't', 'yes', 'on'], true);
     }
 
     private function normalizeRole(string $role): string {

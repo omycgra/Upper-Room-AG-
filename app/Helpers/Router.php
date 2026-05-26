@@ -60,6 +60,7 @@ class Router {
         $this->add('chat/threads', 'ChatController@threads');
         $this->add('chat/messages', 'ChatController@messages');
         $this->add('chat/send', 'ChatController@send');
+        $this->add('chat/delete', 'ChatController@deleteMessage');
         $this->add('settings', 'SettingController@index');
         $this->add('settings/updateBranding', 'SettingController@updateBranding');
         $this->add('settings/updateChurchName', 'SettingController@updateChurchName');
@@ -72,6 +73,7 @@ class Router {
         $this->add('settings/user/delete', 'SettingController@deleteUser');
         $this->add('settings/user/resetPassword', 'SettingController@resetUserPassword');
         $this->add('settings/user/updateUsername', 'SettingController@updateUserUsername');
+        $this->add('settings/user/updateRole', 'SettingController@updateUserRole');
         $this->add('settings/user/approvePasswordReset', 'SettingController@approvePasswordReset');
         $this->add('settings/user/rejectPasswordReset', 'SettingController@rejectPasswordReset');
         $this->add('cluster', 'ClusterController@index');

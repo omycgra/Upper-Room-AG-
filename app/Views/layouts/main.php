@@ -2178,8 +2178,10 @@
                     }
                     const senderId = Number(msg.sender_id || 0);
                     const isMine = senderId === meId;
+                    const deletedForAll = Boolean(msg.deleted_for_all);
                     const wrapper = document.createElement('div');
                     wrapper.className = 'flex items-end gap-2 ' + (isMine ? 'justify-end' : 'justify-start');
+                    if (messageId > 0) wrapper.dataset.messageId = String(messageId);
 
                     if (!isMine) {
                         const avatar = document.createElement('div');
@@ -2193,10 +2195,79 @@
 
                     const bubble = document.createElement('div');
                     bubble.className = (isMine
-                        ? 'max-w-[78%] rounded-2xl bg-accent text-slate-900 px-4 py-3 text-sm font-bold'
-                        : 'max-w-[78%] rounded-2xl bg-slate-950/40 border border-white/10 text-slate-200 px-4 py-3 text-sm font-bold');
-                    bubble.innerHTML = escapeHtml(msg.message || '');
+                        ? 'max-w-[78%] rounded-2xl bg-accent text-slate-900 px-4 py-3 text-sm font-bold relative'
+                        : 'max-w-[78%] rounded-2xl bg-slate-950/40 border border-white/10 text-slate-200 px-4 py-3 text-sm font-bold relative');
+
+                    const textWrap = document.createElement('div');
+                    textWrap.className = deletedForAll ? 'text-[12px] font-black text-slate-300 italic' : '';
+                    textWrap.innerHTML = escapeHtml(deletedForAll ? 'This message was deleted.' : (msg.message || ''));
+                    bubble.appendChild(textWrap);
+
+                    const menuBtn = document.createElement('button');
+                    menuBtn.type = 'button';
+                    menuBtn.className = 'absolute -top-3 -right-3 w-9 h-9 rounded-2xl bg-white/10 border border-white/10 text-slate-300 hover:bg-white/20 flex items-center justify-center';
+                    menuBtn.innerHTML = '<i class="fas fa-ellipsis-vertical text-[11px]"></i>';
+                    menuBtn.setAttribute('aria-label', 'Message options');
+                    bubble.appendChild(menuBtn);
                     wrapper.appendChild(bubble);
+
+                    const deleteChatMessage = async function (id, mode) {
+                        const body = new URLSearchParams();
+                        body.set('message_id', String(id));
+                        body.set('mode', String(mode || 'me'));
+                        const res = await fetch(baseUrl + '/chat/delete', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                            },
+                            body: body.toString()
+                        });
+                        const data = await res.json().catch(() => null);
+                        if (!res.ok || !data || data.success !== true) return null;
+                        return data;
+                    };
+
+                    const canDeleteForAll = (function () {
+                        if (deletedForAll) return false;
+                        if (isAdmin) return true;
+                        if (!isMine) return false;
+                        const createdAt = String(msg.created_at || '').trim();
+                        const ts = createdAt ? Date.parse(createdAt) : NaN;
+                        if (Number.isNaN(ts)) return true;
+                        return (Date.now() - ts) <= (10 * 60 * 1000);
+                    })();
+
+                    menuBtn.addEventListener('click', async function () {
+                        if (messageId <= 0) return;
+                        if (canDeleteForAll) {
+                            const all = window.confirm('Delete for everyone?\\nOK = Delete for everyone\\nCancel = Delete only for me');
+                            if (all) {
+                                const ok = window.confirm('Are you sure you want to delete for everyone?');
+                                if (!ok) return;
+                                const resp = await deleteChatMessage(messageId, 'all');
+                                if (!resp) return;
+                                textWrap.className = 'text-[12px] font-black text-slate-300 italic';
+                                textWrap.textContent = 'This message was deleted.';
+                                loadThreads(true);
+                                return;
+                            }
+                            const okMe = window.confirm('Delete this message for you only?');
+                            if (!okMe) return;
+                            const respMe = await deleteChatMessage(messageId, 'me');
+                            if (!respMe) return;
+                            wrapper.remove();
+                            loadThreads(true);
+                            return;
+                        }
+
+                        const ok = window.confirm('Delete this message for you only?');
+                        if (!ok) return;
+                        const resp = await deleteChatMessage(messageId, 'me');
+                        if (!resp) return;
+                        wrapper.remove();
+                        loadThreads(true);
+                    });
 
                     if (isMine) {
                         const avatar = document.createElement('div');
@@ -2406,7 +2477,7 @@
                         if (!isPanelOpen()) return;
                         if (activeThreadId <= 0) return;
                         loadMessages(activeThreadId, true);
-                    }, 2500);
+                    }, 4500);
                 };
 
                 const closePanel = function () {
@@ -2460,11 +2531,30 @@
                     window.setTimeout(function () {
                         loadThreads(true);
                     }, 900);
-                    if (pollThreadsTimer) window.clearInterval(pollThreadsTimer);
-                    pollThreadsTimer = window.setInterval(function () {
-                        loadThreads(false);
-                        if (isPanelOpen() && activeThreadId > 0) loadMessages(activeThreadId, true);
-                    }, 4500);
+                    let inFlightThreads = false;
+                    let inFlightMessages = false;
+                    const schedule = function () {
+                        if (pollThreadsTimer) window.clearInterval(pollThreadsTimer);
+                        const ms = isPanelOpen() ? 6500 : 18000;
+                        pollThreadsTimer = window.setInterval(function () {
+                            if (document.hidden && !isPanelOpen()) return;
+                            if (!inFlightThreads) {
+                                inFlightThreads = true;
+                                Promise.resolve(loadThreads(false)).finally(() => { inFlightThreads = false; });
+                            }
+                            if (isPanelOpen() && activeThreadId > 0 && !inFlightMessages) {
+                                inFlightMessages = true;
+                                Promise.resolve(loadMessages(activeThreadId, true)).finally(() => { inFlightMessages = false; });
+                            }
+                        }, ms);
+                    };
+                    schedule();
+                    document.addEventListener('visibilitychange', function () {
+                        schedule();
+                    });
+                    toggle.addEventListener('click', function () {
+                        schedule();
+                    });
                 });
 
                 desktopNotifyBtn?.addEventListener('click', async function () {

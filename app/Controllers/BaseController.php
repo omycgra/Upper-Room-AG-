@@ -7,6 +7,23 @@ class BaseController {
             exit;
         }
 
+        try {
+            $db = Database::getInstance();
+            $userId = (int)Session::get('user_id');
+            if ($userId > 0) {
+                if (!$db->columnExists('users', 'last_activity_at')) {
+                    $db->query("ALTER TABLE users ADD COLUMN last_activity_at " . ($db->isPgsql() ? 'TIMESTAMP' : 'DATETIME') . " NULL");
+                }
+                $lastPing = (int)Session::get('last_activity_ping', 0);
+                $now = time();
+                if ($lastPing <= 0 || ($now - $lastPing) >= 30) {
+                    $db->query("UPDATE users SET last_activity_at = NOW() WHERE id = ?", [$userId]);
+                    Session::set('last_activity_ping', $now);
+                }
+            }
+        } catch (Throwable $e) {
+        }
+
         $currentRoute = $this->resolveCurrentRoute();
 
         if (Auth::isAuditor()) {

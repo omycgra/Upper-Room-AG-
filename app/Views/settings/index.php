@@ -48,6 +48,60 @@
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
     <!-- User Management Section -->
     <div class="xl:col-span-2 space-y-8">
+        <?php if ($isAdmin): ?>
+            <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
+                <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex items-center justify-between gap-4 bg-white/[0.02]">
+                    <div class="flex items-center min-w-0">
+                        <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
+                            <i class="fas fa-signal text-accent text-sm"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <h4 class="text-xl font-black text-white tracking-tight truncate">Active Users</h4>
+                            <p class="text-slate-500 font-black mt-2 uppercase tracking-widest text-[10px]">Seen within last 10 minutes</p>
+                        </div>
+                    </div>
+                    <span class="px-4 py-2 text-[9px] font-black rounded-full uppercase tracking-widest border bg-white/5 text-slate-300 border-white/10 shrink-0">
+                        <?php echo (int)count($activeUsers ?? []); ?> Online
+                    </span>
+                </div>
+                <div class="p-4 sm:p-6 lg:p-10">
+                    <?php if (empty($activeUsers)): ?>
+                        <div class="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">No active users right now</p>
+                            <p class="mt-3 text-sm font-black text-slate-200">Open any page to appear as active.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <?php foreach (($activeUsers ?? []) as $au): ?>
+                                <div class="glass-card rounded-[2rem] p-5 border-white/10">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-black text-slate-200 truncate"><?php echo htmlspecialchars((string)($au['name'] ?? '')); ?></p>
+                                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 break-all"><?php echo htmlspecialchars((string)($au['email'] ?? '')); ?></p>
+                                            <?php if (!empty($au['username'])): ?>
+                                                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1 break-all">@<?php echo htmlspecialchars((string)$au['username']); ?></p>
+                                            <?php endif; ?>
+                                        </div>
+                                        <span class="px-3 py-1.5 text-[9px] font-black rounded-full uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shrink-0">
+                                            Active
+                                        </span>
+                                    </div>
+                                    <div class="mt-4 flex items-center justify-between gap-3">
+                                        <span class="px-3 py-1.5 text-[9px] font-black rounded-full uppercase tracking-widest border bg-white/5 text-slate-300 border-white/10">
+                                            <?php echo htmlspecialchars((string)($au['role'] ?? '')); ?>
+                                        </span>
+                                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                            <?php echo !empty($au['last_activity_at']) ? date('H:i', strtotime((string)$au['last_activity_at'])) : ''; ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
             <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/[0.02]">
                 <div class="flex items-center">
@@ -65,6 +119,10 @@
             </div>
             <div class="md:hidden p-4 sm:p-6 space-y-4">
                 <?php if (!empty($users) && is_array($users)): foreach ($users as $user): ?>
+                    <?php
+                        $lastActivity = (string)($user['last_activity_at'] ?? '');
+                        $isActive = $lastActivity !== '' && strtotime($lastActivity) !== false && (time() - (int)strtotime($lastActivity)) <= 600;
+                    ?>
                     <div class="glass-card rounded-[2rem] p-4 sm:p-5 border-white/10">
                         <div class="flex items-start justify-between gap-4">
                             <div class="flex items-center min-w-0">
@@ -108,6 +166,16 @@
                                             class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
                                             <i class="fas fa-at text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Edit Username</span>
                                         </button>
+                                        <button type="button"
+                                            data-edit-role="1"
+                                            data-user-id="<?php echo (int)$user['id']; ?>"
+                                            data-user-name="<?php echo htmlspecialchars((string)$user['name']); ?>"
+                                            data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
+                                            data-user-role="<?php echo htmlspecialchars((string)($user['role'] ?? '')); ?>"
+                                            data-user-department-id="<?php echo htmlspecialchars((string)($user['department_id'] ?? '')); ?>"
+                                            class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
+                                            <i class="fas fa-user-gear text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Edit Permission</span>
+                                        </button>
                                         <a href="settings/user/delete?id=<?php echo $user['id']; ?>" 
                                            onclick="return confirm('Security Check: Permanent deletion of this account?')"
                                            class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-500 hover-glow-red transition-all duration-500 border border-white/5">
@@ -121,6 +189,12 @@
                                 </div>
                             <?php endif; ?>
                         </div>
+                        <?php if ($isActive): ?>
+                            <div class="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-[9px] font-black uppercase tracking-widest text-emerald-400">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                Active Now
+                            </div>
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; endif; ?>
             </div>
@@ -183,6 +257,16 @@
                                                     data-user-username="<?php echo htmlspecialchars((string)($user['username'] ?? '')); ?>"
                                                     class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
                                                     <i class="fas fa-at text-xs"></i>
+                                                </button>
+                                                <button type="button"
+                                                    data-edit-role="1"
+                                                    data-user-id="<?php echo (int)$user['id']; ?>"
+                                                    data-user-name="<?php echo htmlspecialchars((string)$user['name']); ?>"
+                                                    data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
+                                                    data-user-role="<?php echo htmlspecialchars((string)($user['role'] ?? '')); ?>"
+                                                    data-user-department-id="<?php echo htmlspecialchars((string)($user['department_id'] ?? '')); ?>"
+                                                    class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
+                                                    <i class="fas fa-user-gear text-xs"></i>
                                                 </button>
                                                 <a href="settings/user/delete?id=<?php echo $user['id']; ?>" 
                                                    onclick="return confirm('Security Check: Permanent deletion of this account?')"
@@ -855,6 +939,55 @@
     </div>
 </div>
 
+<div id="edit-role-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-md rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center mb-10">
+            <div>
+                <h3 class="text-3xl font-black text-white tracking-tighter">Edit Permission</h3>
+                <p id="edit-role-target" class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2"></p>
+            </div>
+            <button type="button" onclick="document.getElementById('edit-role-modal').classList.add('hidden')" class="w-10 h-10 bg-white/5 hover:bg-accent hover:text-slate-900 text-slate-400 rounded-xl flex items-center justify-center transition-all border border-white/10">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <form action="<?php echo BASE_URL; ?>/settings/user/updateRole" method="POST" data-loader="top" class="space-y-8">
+            <input type="hidden" name="user_id" id="edit-role-user-id" value="">
+            <div class="space-y-3">
+                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Permission Level</label>
+                <div class="relative">
+                    <i class="fas fa-user-gear absolute left-5 top-1/2 -translate-y-1/2 text-slate-600"></i>
+                    <select id="edit-role-select" name="role" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-4 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
+                        <option value="finance_staff">Finance Staff</option>
+                        <option value="finance_head">Head Of Finance</option>
+                        <option value="dept_head">Department Head</option>
+                        <option value="visitation_team">Visitation Team</option>
+                        <option value="auditor">Auditor</option>
+                        <option value="pastor">Pastor</option>
+                        <option value="admin">System Administrator</option>
+                    </select>
+                    <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px]"></i>
+                </div>
+            </div>
+            <div id="edit-role-department-wrap" class="space-y-3 hidden">
+                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Department</label>
+                <div class="relative">
+                    <i class="fas fa-sitemap absolute left-5 top-1/2 -translate-y-1/2 text-slate-600"></i>
+                    <select id="edit-role-department" name="department_id" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-4 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
+                        <option value="">Select Department</option>
+                        <?php foreach (($departments ?? []) as $d): ?>
+                            <option value="<?php echo (int)$d['id']; ?>"><?php echo htmlspecialchars($d['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px]"></i>
+                </div>
+            </div>
+            <button type="submit" class="w-full bg-accent text-slate-900 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                Update Permission
+            </button>
+        </form>
+    </div>
+</div>
+
 <div id="reset-password-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4">
     <div class="glass-card w-full max-w-md rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center mb-10">
@@ -976,6 +1109,52 @@
             open(btn.dataset.userId, btn.dataset.userName, btn.dataset.userEmail, btn.dataset.userUsername);
         });
 
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.add('hidden');
+        });
+    })();
+</script>
+<?php endif; ?>
+
+<?php if ($isAdmin): ?>
+<script>
+    (function () {
+        const modal = document.getElementById('edit-role-modal');
+        const userIdInput = document.getElementById('edit-role-user-id');
+        const label = document.getElementById('edit-role-target');
+        const role = document.getElementById('edit-role-select');
+        const deptWrap = document.getElementById('edit-role-department-wrap');
+        const dept = document.getElementById('edit-role-department');
+        if (!modal || !userIdInput || !label || !role || !deptWrap || !dept) return;
+
+        const applyDeptVisibility = () => {
+            const v = (role.value || '').toLowerCase();
+            if (v === 'dept_head' || v === 'visitation_team') {
+                deptWrap.classList.remove('hidden');
+            } else {
+                dept.value = '';
+                deptWrap.classList.add('hidden');
+            }
+        };
+
+        const open = (id, name, email, roleValue, deptId) => {
+            userIdInput.value = String(id || '');
+            const safeName = (name || '').trim();
+            const safeEmail = (email || '').trim();
+            label.textContent = safeName !== '' ? `${safeName} • ${safeEmail}` : safeEmail;
+            role.value = (roleValue || '').trim();
+            dept.value = String(deptId || '');
+            applyDeptVisibility();
+            modal.classList.remove('hidden');
+        };
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-edit-role="1"]');
+            if (!btn) return;
+            open(btn.dataset.userId, btn.dataset.userName, btn.dataset.userEmail, btn.dataset.userRole, btn.dataset.userDepartmentId);
+        });
+
+        role.addEventListener('change', applyDeptVisibility);
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.classList.add('hidden');
         });
