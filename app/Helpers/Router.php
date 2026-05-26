@@ -127,7 +127,7 @@ class Router {
 
         if (array_key_exists($uri, $this->routes)) {
             // Basic Authentication Guard
-            if (!in_array($uri, ['login', 'forgot-password', 'reset-password'], true) && !Auth::check()) {
+            if (!in_array($uri, ['login', 'forgot-password', 'reset-password', 'api/attendance/import'], true) && !Auth::check()) {
                 $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
                 header("Location: $base/login");
                 exit;
