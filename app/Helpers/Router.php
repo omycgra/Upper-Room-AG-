@@ -38,6 +38,10 @@ class Router {
         $this->add('attendance/mark', 'AttendanceController@mark');
         $this->add('attendance/store', 'AttendanceController@store');
         $this->add('attendance/syncBioTime', 'AttendanceController@syncBioTime');
+        $this->add('attendance/quick', 'AttendanceController@quick');
+        $this->add('attendance/quickMark', 'AttendanceController@quickMark');
+        $this->add('attendance/pushOnline', 'AttendanceController@pushOnline');
+        $this->add('api/attendance/import', 'AuthController@importAttendance');
         $this->add('finance', 'FinanceController@index');
         $this->add('finance/add', 'FinanceController@add');
         $this->add('finance/store', 'FinanceController@store');
@@ -75,6 +79,7 @@ class Router {
         $this->add('settings/updateTheme', 'SettingController@updateTheme');
         $this->add('settings/updateProfile', 'SettingController@updateProfile');
         $this->add('settings/updateSmsConfig', 'SettingController@updateSmsConfig');
+        $this->add('settings/updateAttendanceConfig', 'SettingController@updateAttendanceConfig');
         $this->add('settings/updateDatabaseConnection', 'SettingController@updateDatabaseConnection');
         $this->add('settings/user/add', 'SettingController@addUser');
         $this->add('settings/user/delete', 'SettingController@deleteUser');

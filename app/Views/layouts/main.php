@@ -2959,6 +2959,45 @@
             });
         })();
     </script>
+    <script>
+        (function () {
+            const decorate = function (input) {
+                if (!input || input.dataset.pwToggle === '1') return;
+                const parent = input.closest('.relative') || input.parentElement;
+                if (!parent) return;
+                if (parent.querySelector('.ag-password-toggle')) {
+                    input.dataset.pwToggle = '1';
+                    return;
+                }
+                const computed = window.getComputedStyle(parent);
+                if (computed && computed.position === 'static') {
+                    parent.style.position = 'relative';
+                }
+                if (!input.style.paddingRight) {
+                    input.style.paddingRight = '3.5rem';
+                }
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'ag-password-toggle absolute inset-y-0 right-0 pr-5 flex items-center text-slate-500 hover:text-accent transition-colors';
+                btn.setAttribute('aria-label', 'Show password');
+                btn.innerHTML = '<i class="fas fa-eye text-[14px]"></i>';
+                btn.addEventListener('click', function () {
+                    input.type = input.type === 'password' ? 'text' : 'password';
+                    const icon = btn.querySelector('i');
+                    const isHidden = input.type === 'password';
+                    btn.setAttribute('aria-label', isHidden ? 'Show password' : 'Hide password');
+                    if (icon) {
+                        icon.classList.toggle('fa-eye', isHidden);
+                        icon.classList.toggle('fa-eye-slash', !isHidden);
+                    }
+                });
+                parent.appendChild(btn);
+                input.dataset.pwToggle = '1';
+            };
+
+            document.querySelectorAll('input[type="password"]').forEach(decorate);
+        })();
+    </script>
     <?php if (in_array($current_route, ['dashboard', 'pastor'], true) && Session::get('just_logged_in')): ?>
         <script>
             (function () {

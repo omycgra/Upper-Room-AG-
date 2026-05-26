@@ -243,6 +243,8 @@
                 <option value="first_name" <?php echo $sort === 'first_name' ? 'selected' : ''; ?>>First Name (A–Z)</option>
                 <option value="last_name" <?php echo $sort === 'last_name' ? 'selected' : ''; ?>>Last Name (A–Z)</option>
                 <option value="member_code" <?php echo $sort === 'member_code' ? 'selected' : ''; ?>>Member Code (A–Z)</option>
+                <option value="bio_id" <?php echo $sort === 'bio_id' ? 'selected' : ''; ?>>Bio ID (A–Z)</option>
+                <option value="newest" <?php echo $sort === 'newest' ? 'selected' : ''; ?>>Newest First</option>
             </select>
             <button type="submit" class="w-full bg-accent text-slate-900 rounded-2xl px-5 py-4 font-black text-[10px] uppercase tracking-widest hover:opacity-90 transition-all">
                 <i class="fas fa-search mr-2"></i> Filter
@@ -256,7 +258,7 @@
                 const dept = document.getElementById('pastor-members-filter-department');
                 const status = document.getElementById('pastor-members-filter-status');
                 if (!form) return;
-                const submit = () => form.submit();
+                const submit = () => (form.requestSubmit ? form.requestSubmit() : form.submit());
                 sort?.addEventListener('change', submit);
                 dept?.addEventListener('change', submit);
                 status?.addEventListener('change', submit);

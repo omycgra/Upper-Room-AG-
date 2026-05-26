@@ -98,6 +98,8 @@
                 <option value="first_name" <?php echo $sort === 'first_name' ? 'selected' : ''; ?>>First Name (A–Z)</option>
                 <option value="last_name" <?php echo $sort === 'last_name' ? 'selected' : ''; ?>>Last Name (A–Z)</option>
                 <option value="member_code" <?php echo $sort === 'member_code' ? 'selected' : ''; ?>>Member Code (A–Z)</option>
+                <option value="bio_id" <?php echo $sort === 'bio_id' ? 'selected' : ''; ?>>Bio ID (A–Z)</option>
+                <option value="newest" <?php echo $sort === 'newest' ? 'selected' : ''; ?>>Newest First</option>
             </select>
             <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
         </div>
@@ -107,6 +109,14 @@
                 <select id="members-filter-status" name="status" class="w-full pl-6 pr-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest focus:ring-2 focus:ring-accent outline-none appearance-none cursor-pointer">
                     <option value="">Status</option>
                     <option value="Active" <?php echo $filters['status'] === 'Active' ? 'selected' : ''; ?>>Active</option>
+                </select>
+                <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
+            </div>
+            <div class="flex-1 relative">
+                <?php $added = (string)($filters['added'] ?? ''); ?>
+                <select id="members-filter-added" name="added" class="w-full pl-6 pr-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest focus:ring-2 focus:ring-accent outline-none appearance-none cursor-pointer">
+                    <option value="" <?php echo $added === '' ? 'selected' : ''; ?>>Added</option>
+                    <option value="today" <?php echo $added === 'today' ? 'selected' : ''; ?>>Today</option>
                 </select>
                 <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
             </div>
@@ -123,11 +133,13 @@
         const sort = document.getElementById('members-filter-sort');
         const dept = document.getElementById('members-filter-department');
         const status = document.getElementById('members-filter-status');
+        const added = document.getElementById('members-filter-added');
         if (!form) return;
-        const submit = () => form.submit();
+        const submit = () => (form.requestSubmit ? form.requestSubmit() : form.submit());
         sort?.addEventListener('change', submit);
         dept?.addEventListener('change', submit);
         status?.addEventListener('change', submit);
+        added?.addEventListener('change', submit);
     })();
 </script>
 

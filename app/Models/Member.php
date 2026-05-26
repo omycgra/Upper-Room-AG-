@@ -67,7 +67,7 @@ class Member extends BaseModel {
         );
     }
 
-    public function searchAndFilter($term = '', $deptId = '', $status = '', $sort = '') {
+    public function searchAndFilter($term = '', $deptId = '', $status = '', $sort = '', $added = '') {
         $sql = "SELECT m.*, d.name as department_name, d.name as primary_department_name
                 FROM members m
                 LEFT JOIN departments d ON m.department_id = d.id
@@ -99,15 +99,58 @@ class Member extends BaseModel {
             $params[] = $status;
         }
 
+        $addedKey = strtolower(trim((string)$added));
+        if ($addedKey === 'today') {
+            if (self::$hasCreatedAtColumn === null) {
+                $cache = Session::get('members_has_created_at_column');
+                if ($cache !== null) {
+                    self::$hasCreatedAtColumn = (bool)$cache;
+                } else {
+                    self::$hasCreatedAtColumn = $this->db->columnExists('members', 'created_at');
+                    Session::set('members_has_created_at_column', self::$hasCreatedAtColumn);
+                }
+            }
+            $today = date('Y-m-d');
+            $tomorrow = date('Y-m-d', strtotime($today . ' +1 day'));
+            if (self::$hasCreatedAtColumn) {
+                $sql .= " AND m.created_at >= ? AND m.created_at < ?";
+                $params[] = $today;
+                $params[] = $tomorrow;
+            } else {
+                $sql .= " AND m.join_date >= ? AND m.join_date < ?";
+                $params[] = $today;
+                $params[] = $tomorrow;
+            }
+        }
+
         $sortKey = strtolower(trim((string)$sort));
+        $defaultSort = 'm.last_name ASC, m.first_name ASC';
         $allowedSort = [
-            '' => 'm.last_name ASC, m.first_name ASC',
-            'name' => 'm.last_name ASC, m.first_name ASC',
+            '' => $defaultSort,
+            'name' => $defaultSort,
             'first_name' => 'm.first_name ASC, m.last_name ASC',
             'last_name' => 'm.last_name ASC, m.first_name ASC',
             'member_code' => 'm.member_code ASC, m.last_name ASC, m.first_name ASC',
+            'bio_id' => "COALESCE(m.bio_id, '') ASC, m.last_name ASC, m.first_name ASC",
         ];
-        $sql .= " ORDER BY " . ($allowedSort[$sortKey] ?? $allowedSort['']);
+        if ($sortKey === 'newest') {
+            if (self::$hasCreatedAtColumn === null) {
+                $cache = Session::get('members_has_created_at_column');
+                if ($cache !== null) {
+                    self::$hasCreatedAtColumn = (bool)$cache;
+                } else {
+                    self::$hasCreatedAtColumn = $this->db->columnExists('members', 'created_at');
+                    Session::set('members_has_created_at_column', self::$hasCreatedAtColumn);
+                }
+            }
+            if (self::$hasCreatedAtColumn) {
+                $sql .= " ORDER BY m.created_at DESC, m.id DESC";
+            } else {
+                $sql .= " ORDER BY m.join_date DESC, m.id DESC";
+            }
+        } else {
+            $sql .= " ORDER BY " . ($allowedSort[$sortKey] ?? $defaultSort);
+        }
         $rows = $this->db->fetchAll($sql, $params);
         return $this->attachDepartmentAssignments($rows);
     }

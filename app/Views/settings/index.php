@@ -814,6 +814,168 @@
             })();
         </script>
 
+        <?php
+            $att = $attendanceConfig ?? [];
+            $attMode = strtolower(trim((string)($att['mode'] ?? 'manual')));
+            if (!in_array($attMode, ['manual', 'biotime', 'qrcode', 'link'], true)) $attMode = 'manual';
+            $attBioUrl = (string)($att['biotime_url'] ?? '');
+            $attBioUser = (string)($att['biotime_username'] ?? '');
+            $attBioTz = (string)($att['biotime_tz'] ?? 'Africa/Accra');
+            $attHasToken = trim((string)($att['biotime_token'] ?? '')) !== '';
+            $attHasPass = trim((string)($att['biotime_password'] ?? '')) !== '';
+            $attCloudUrl = (string)($att['cloud_url'] ?? '');
+            $attCloudHasToken = trim((string)($att['cloud_token'] ?? '')) !== '';
+            $attCloudLast = trim((string)($att['cloud_last_pushed_at'] ?? ''));
+        ?>
+        <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 lg:p-10 border-white/5 card-interaction mt-8">
+            <div class="flex items-center mb-10">
+                <div class="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center mr-4 border border-accent/20">
+                    <i class="fas fa-check-square text-accent text-lg"></i>
+                </div>
+                <h4 class="text-xl font-black text-white tracking-tight">Attendance Configuration</h4>
+            </div>
+
+            <form action="<?php echo BASE_URL; ?>/settings/updateAttendanceConfig" method="POST" class="space-y-8">
+                <div class="space-y-3">
+                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Attendance Mode</label>
+                    <div class="relative group">
+                        <i class="fas fa-sliders absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                        <select <?php echo $isAdmin ? '' : 'disabled'; ?> id="attendance-mode" name="attendance_mode" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-4 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
+                            <option value="manual" <?php echo $attMode === 'manual' ? 'selected' : ''; ?>>Manual (Select Members)</option>
+                            <option value="biotime" <?php echo $attMode === 'biotime' ? 'selected' : ''; ?>>BioTime Device Sync</option>
+                            <option value="qrcode" <?php echo $attMode === 'qrcode' ? 'selected' : ''; ?>>QR Code (Quick Mark)</option>
+                            <option value="link" <?php echo $attMode === 'link' ? 'selected' : ''; ?>>Link (Quick Mark)</option>
+                        </select>
+                        <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
+                    </div>
+                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Only one mode will appear on the Attendance page</p>
+                </div>
+
+                <div id="attendance-biotime-fields" class="space-y-8">
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">BioTime URL</label>
+                        <div class="relative group">
+                            <i class="fas fa-link absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="text" name="attendance_biotime_url" value="<?php echo htmlspecialchars($attBioUrl); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-xs font-black text-slate-200 transition-all outline-none" placeholder="https://biotime.yourchurch.com">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div class="space-y-3">
+                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Username</label>
+                            <div class="relative group">
+                                <i class="fas fa-user absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                                <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="text" name="attendance_biotime_username" value="<?php echo htmlspecialchars($attBioUser); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-xs font-black text-slate-200 transition-all outline-none" placeholder="BioTime login username">
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Password</label>
+                            <div class="relative group">
+                                <i class="fas fa-key absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                                <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="password" name="attendance_biotime_password" value="" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-xs font-black text-slate-200 transition-all outline-none" placeholder="<?php echo $attHasPass ? 'Leave blank to keep current' : 'Enter BioTime password'; ?>">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Token (Optional)</label>
+                        <div class="relative group">
+                            <i class="fas fa-fingerprint absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="password" name="attendance_biotime_token" value="" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-xs font-black text-slate-200 transition-all outline-none" placeholder="<?php echo $attHasToken ? 'Leave blank to keep current' : 'Paste BioTime token (if available)'; ?>">
+                        </div>
+                        <div class="flex items-center justify-between gap-4">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">If token is empty, system uses username/password login</p>
+                            <?php if ($attHasToken): ?>
+                                <label class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                                    <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="checkbox" name="attendance_biotime_token_clear" value="1" class="accent-yellow-400">
+                                    Clear Token
+                                </label>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Timezone</label>
+                        <div class="relative group">
+                            <i class="fas fa-clock absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="text" name="attendance_biotime_tz" value="<?php echo htmlspecialchars($attBioTz); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-xs font-black text-slate-200 transition-all outline-none" placeholder="Africa/Accra">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="attendance-quick-fields" class="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Quick Mark Mode</p>
+                    <p class="mt-3 text-sm font-black text-slate-200">The Attendance page will show a service link (and optional QR code) to open the quick marking screen.</p>
+                </div>
+
+                <div class="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Push To Online (Optional)</p>
+                    <p class="mt-3 text-sm font-black text-slate-200">Use this if you sync attendance locally (offline) and want to push to the online system with one click.</p>
+
+                    <div class="mt-6 space-y-6">
+                        <div class="space-y-3">
+                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Online Base URL</label>
+                            <div class="relative group">
+                                <i class="fas fa-cloud-arrow-up absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                                <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="text" name="attendance_cloud_url" value="<?php echo htmlspecialchars($attCloudUrl); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-xs font-black text-slate-200 transition-all outline-none" placeholder="https://your-app.up.railway.app">
+                            </div>
+                            <?php if ($attCloudLast !== ''): ?>
+                                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Last pushed: <span class="text-slate-300"><?php echo htmlspecialchars($attCloudLast); ?></span></p>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="space-y-3">
+                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Sync Token</label>
+                            <div class="relative group">
+                                <i class="fas fa-key absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                                <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="password" name="attendance_cloud_token" value="" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-xs font-black text-slate-200 transition-all outline-none" placeholder="<?php echo $attCloudHasToken ? 'Leave blank to keep current' : 'Set a secret token (must match online)'; ?>">
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Set the same token on both local and online</p>
+                                <?php if ($attCloudHasToken): ?>
+                                    <label class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                                        <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="checkbox" name="attendance_cloud_token_clear" value="1" class="accent-yellow-400">
+                                        Clear Token
+                                    </label>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button <?php echo $isAdmin ? '' : 'disabled'; ?> type="submit" class="w-full bg-accent text-slate-900 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover-glow-yellow active:scale-95 transition-all shadow-xl shadow-yellow-500/10 disabled:opacity-60 disabled:cursor-not-allowed">
+                    Save Attendance Settings
+                </button>
+                <?php if (!$isAdmin): ?>
+                    <p class="text-center text-[10px] font-black uppercase tracking-widest text-slate-500">Admin only</p>
+                <?php endif; ?>
+            </form>
+        </div>
+
+        <script>
+            (function () {
+                const select = document.getElementById('attendance-mode');
+                const biotime = document.getElementById('attendance-biotime-fields');
+                const quick = document.getElementById('attendance-quick-fields');
+                if (!select || !biotime || !quick) return;
+                const apply = () => {
+                    const v = (select.value || 'manual').toLowerCase();
+                    if (v === 'biotime') {
+                        biotime.classList.remove('hidden');
+                        quick.classList.add('hidden');
+                    } else if (v === 'qrcode' || v === 'link') {
+                        biotime.classList.add('hidden');
+                        quick.classList.remove('hidden');
+                    } else {
+                        biotime.classList.add('hidden');
+                        quick.classList.add('hidden');
+                    }
+                };
+                select.addEventListener('change', apply);
+                apply();
+            })();
+        </script>
+
         <div class="glass-card rounded-[3rem] p-10 border-white/5 card-interaction">
             <div class="flex items-center mb-10">
                 <div class="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center mr-4 border border-accent/20">

@@ -1517,25 +1517,64 @@
         })();
 
         (function () {
-            const password = document.getElementById('password');
-            const toggle = document.getElementById('toggle-password');
-            if (!password || !toggle) return;
+            const decorate = function (input) {
+                if (!input || input.dataset.pwToggle === '1') return;
+                const parent = input.closest('.relative') || input.parentElement;
+                if (!parent) return;
+                const existing = parent.querySelector('#toggle-password') || parent.querySelector('.ag-password-toggle');
+                if (existing) {
+                    const btn = existing;
+                    const icon = btn.querySelector ? btn.querySelector('i') : null;
+                    const sync = () => {
+                        const isHidden = input.type === 'password';
+                        btn.setAttribute('aria-label', isHidden ? 'Show password' : 'Hide password');
+                        if (icon) {
+                            icon.classList.toggle('fa-eye', isHidden);
+                            icon.classList.toggle('fa-eye-slash', !isHidden);
+                        }
+                    };
+                    if (!btn.dataset.pwBound) {
+                        btn.addEventListener('click', function () {
+                            input.type = input.type === 'password' ? 'text' : 'password';
+                            sync();
+                        });
+                        btn.dataset.pwBound = '1';
+                    }
+                    if (!input.className.includes('pr-14')) {
+                        input.className = input.className.replace(/\bpr-\d+\b/g, '').trim() + ' pr-14';
+                    }
+                    sync();
+                    input.dataset.pwToggle = '1';
+                    return;
+                }
 
-            const icon = toggle.querySelector('i');
-            const sync = () => {
-                const isHidden = password.type === 'password';
-                toggle.setAttribute('aria-label', isHidden ? 'Show password' : 'Hide password');
-                if (!icon) return;
-                icon.classList.toggle('fa-eye', isHidden);
-                icon.classList.toggle('fa-eye-slash', !isHidden);
+                const computed = window.getComputedStyle(parent);
+                if (computed && computed.position === 'static') {
+                    parent.style.position = 'relative';
+                }
+                if (!input.className.includes('pr-14')) {
+                    input.className = input.className.replace(/\bpr-\d+\b/g, '').trim() + ' pr-14';
+                }
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'ag-password-toggle absolute inset-y-0 right-0 pr-5 flex items-center text-slate-500 login-accent-hover transition-colors';
+                btn.setAttribute('aria-label', 'Show password');
+                btn.innerHTML = '<i class="fas fa-eye text-[14px]"></i>';
+                btn.addEventListener('click', function () {
+                    input.type = input.type === 'password' ? 'text' : 'password';
+                    const icon = btn.querySelector('i');
+                    const isHidden = input.type === 'password';
+                    btn.setAttribute('aria-label', isHidden ? 'Show password' : 'Hide password');
+                    if (icon) {
+                        icon.classList.toggle('fa-eye', isHidden);
+                        icon.classList.toggle('fa-eye-slash', !isHidden);
+                    }
+                });
+                parent.appendChild(btn);
+                input.dataset.pwToggle = '1';
             };
 
-            toggle.addEventListener('click', function () {
-                password.type = password.type === 'password' ? 'text' : 'password';
-                sync();
-            });
-
-            sync();
+            document.querySelectorAll('input[type="password"]').forEach(decorate);
         })();
     </script>
 </body>

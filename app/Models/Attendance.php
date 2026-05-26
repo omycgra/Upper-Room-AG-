@@ -33,6 +33,27 @@ class Attendance extends BaseModel {
         return !empty($row);
     }
 
+    public function getForServiceWithMember(string $serviceDate, string $serviceType): array
+    {
+        $serviceDate = trim($serviceDate);
+        $serviceType = trim($serviceType);
+        if ($serviceDate === '' || $serviceType === '') {
+            return [];
+        }
+
+        return $this->db->fetchAll(
+            "SELECT a.*,
+                    m.member_code,
+                    m.bio_id
+             FROM attendance a
+             LEFT JOIN members m ON a.member_id = m.id
+             WHERE a.service_date = ?
+               AND a.service_type = ?
+             ORDER BY a.id ASC",
+            [$serviceDate, $serviceType]
+        ) ?: [];
+    }
+
     public function getServiceAttendance($date, $type) {
         $sql = "SELECT a.*, m.first_name, m.last_name 
                 FROM attendance a

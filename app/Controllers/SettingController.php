@@ -52,6 +52,21 @@ class SettingController extends BaseController {
         $smsTwilioAccountSid = AppConfig::getSetting('sms_twilio_account_sid', '');
         $smsTwilioAuthToken = AppConfig::getSetting('sms_twilio_auth_token', '');
         $smsTwilioFrom = AppConfig::getSetting('sms_twilio_from', '');
+        $attendanceMode = strtolower(trim((string)AppConfig::getSetting('attendance_mode', 'manual')));
+        if (!in_array($attendanceMode, ['manual', 'biotime', 'qrcode', 'link'], true)) {
+            $attendanceMode = 'manual';
+        }
+        $attendanceConfig = [
+            'mode' => $attendanceMode,
+            'biotime_url' => (string)AppConfig::getSetting('attendance_biotime_url', ''),
+            'biotime_token' => (string)AppConfig::getSetting('attendance_biotime_token', ''),
+            'biotime_username' => (string)AppConfig::getSetting('attendance_biotime_username', ''),
+            'biotime_password' => (string)AppConfig::getSetting('attendance_biotime_password', ''),
+            'biotime_tz' => (string)AppConfig::getSetting('attendance_biotime_tz', 'Africa/Accra'),
+            'cloud_url' => (string)AppConfig::getSetting('attendance_cloud_url', ''),
+            'cloud_token' => (string)AppConfig::getSetting('attendance_cloud_token', ''),
+            'cloud_last_pushed_at' => (string)AppConfig::getSetting('attendance_cloud_last_pushed_at', ''),
+        ];
         $storageConfig = [
             'supabase_url' => trim((string)Env::get('SUPABASE_URL', '')),
             'bucket' => trim((string)Env::get('SUPABASE_STORAGE_BUCKET', '')) !== '' ? trim((string)Env::get('SUPABASE_STORAGE_BUCKET', '')) : 'uploads',
@@ -95,6 +110,7 @@ class SettingController extends BaseController {
             'smsTwilioAccountSid' => $smsTwilioAccountSid,
             'smsTwilioAuthToken' => $smsTwilioAuthToken,
             'smsTwilioFrom' => $smsTwilioFrom,
+            'attendanceConfig' => $attendanceConfig,
             'storageConfig' => $storageConfig,
             'dbConfig' => $dbConfig,
             'me' => $me,
@@ -1151,6 +1167,73 @@ class SettingController extends BaseController {
         $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
         header("Location: $base/settings");
         exit;
+    }
+
+    public function updateAttendanceConfig()
+    {
+        $this->isAdmin();
+
+        $db = Database::getInstance();
+        $mode = strtolower(trim((string)($_POST['attendance_mode'] ?? AppConfig::getSetting('attendance_mode', 'manual'))));
+        if (!in_array($mode, ['manual', 'biotime', 'qrcode', 'link'], true)) {
+            $mode = 'manual';
+        }
+
+        $biotimeUrl = trim((string)($_POST['attendance_biotime_url'] ?? ''));
+        $biotimeToken = trim((string)($_POST['attendance_biotime_token'] ?? ''));
+        $biotimeTokenClear = (string)($_POST['attendance_biotime_token_clear'] ?? '') === '1';
+        $biotimeUsername = trim((string)($_POST['attendance_biotime_username'] ?? ''));
+        $biotimePassword = trim((string)($_POST['attendance_biotime_password'] ?? ''));
+        $biotimeTz = trim((string)($_POST['attendance_biotime_tz'] ?? 'Africa/Accra'));
+        $cloudUrl = trim((string)($_POST['attendance_cloud_url'] ?? ''));
+        $cloudToken = trim((string)($_POST['attendance_cloud_token'] ?? ''));
+        $cloudTokenClear = (string)($_POST['attendance_cloud_token_clear'] ?? '') === '1';
+
+        $biotimeUrl = rtrim($biotimeUrl, '/');
+        if ($biotimeUrl !== '' && !preg_match('#^https?://#i', $biotimeUrl)) {
+            $biotimeUrl = 'https://' . $biotimeUrl;
+        }
+
+        if ($biotimeTz === '') {
+            $biotimeTz = 'Africa/Accra';
+        }
+
+        $cloudUrl = rtrim($cloudUrl, '/');
+        if ($cloudUrl !== '' && !preg_match('#^https?://#i', $cloudUrl)) {
+            $cloudUrl = 'https://' . $cloudUrl;
+        }
+
+        try {
+            $this->upsertSetting($db, 'attendance_mode', $mode);
+            $this->upsertSetting($db, 'attendance_biotime_url', $biotimeUrl);
+            $this->upsertSetting($db, 'attendance_biotime_username', $biotimeUsername);
+            $this->upsertSetting($db, 'attendance_biotime_tz', $biotimeTz);
+            $this->upsertSetting($db, 'attendance_cloud_url', $cloudUrl);
+
+            $oldToken = trim((string)AppConfig::getSetting('attendance_biotime_token', ''));
+            $oldPass = trim((string)AppConfig::getSetting('attendance_biotime_password', ''));
+            if ($biotimeTokenClear) {
+                $this->upsertSetting($db, 'attendance_biotime_token', '');
+            } elseif ($biotimeToken !== '' || $oldToken === '') {
+                $this->upsertSetting($db, 'attendance_biotime_token', $biotimeToken);
+            }
+            if ($biotimePassword !== '' || $oldPass === '') {
+                $this->upsertSetting($db, 'attendance_biotime_password', $biotimePassword);
+            }
+            $oldCloudToken = trim((string)AppConfig::getSetting('attendance_cloud_token', ''));
+            if ($cloudTokenClear) {
+                $this->upsertSetting($db, 'attendance_cloud_token', '');
+            } elseif ($cloudToken !== '' || $oldCloudToken === '') {
+                $this->upsertSetting($db, 'attendance_cloud_token', $cloudToken);
+            }
+
+            AuditLog::log('Updated attendance configuration', 'settings');
+            Session::flash('success', 'Attendance settings saved.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to save attendance settings: ' . $e->getMessage());
+        }
+
+        $this->redirectSettings();
     }
 
     private function upsertSetting($db, $key, $value) {

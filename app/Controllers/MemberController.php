@@ -15,12 +15,13 @@ class MemberController extends BaseController {
         $deptFilter = $_GET['department'] ?? '';
         $statusFilter = $_GET['status'] ?? '';
         $sort = $_GET['sort'] ?? '';
+        $added = $_GET['added'] ?? '';
 
         if (Session::get('user_role') === 'dept_head') {
             $deptFilter = (string)(Session::get('user_department_id') ?? '');
         }
         
-        $members = $memberModel->searchAndFilter($searchTerm, $deptFilter, $statusFilter, $sort);
+        $members = $memberModel->searchAndFilter($searchTerm, $deptFilter, $statusFilter, $sort, $added);
         $stats = $memberModel->getStats();
         $departments = $deptModel->all();
         $clusters = $clusterModel->all();
@@ -35,7 +36,8 @@ class MemberController extends BaseController {
                 'search' => $searchTerm,
                 'department' => $deptFilter,
                 'status' => $statusFilter,
-                'sort' => $sort
+                'sort' => $sort,
+                'added' => $added
             ]
         ]);
     }
@@ -320,7 +322,7 @@ class MemberController extends BaseController {
         $filename = "member_import_template.csv";
         $headers = [
             "BIO ID", "FIRST NAME", "LAST NAME", "GENDER", "DATE OF BIRTH",
-            "NATIONALITY", "PHONE NUMBER", "ADDRESS", "HOME TOWN", "MARITAL STATUS",
+            "NATIONALITY", "PHONE NUMBER", "ADDRESS", "STAYS AT", "HOME TOWN", "MARITAL STATUS",
             "NAME OF SPOUSE", "MOTHER NAME", "FATHER NAME", "HAVE YOU BEEN BAPTIZED",
             "PASTOR WHO BAPTIZED YOU AND CHURCH", "ARE YOU WORKING", "NAME OF WORK",
             "GROUP", "DEPARTMENT", "INITIAL STATUS"
@@ -335,7 +337,7 @@ class MemberController extends BaseController {
         // Add an example row
         fputcsv($output, [
             "BIO-001", "CHRISTOPHER", "AGYEI", "MALE", "1990-01-01",
-            "GHANAIAN", "0240000000", "MAMPONG ESTATE", "KUMASI", "MARRIED",
+            "GHANAIAN", "0240000000", "MAMPONG ESTATE", "MAMPONG", "KUMASI", "MARRIED",
             "ABENA AGYEI", "GRACE AGYEI", "MICHAEL AGYEI", "YES",
             "PASTOR MENSAH - UPPER ROOM", "YES", "TEACHER", "YOUTH", "VISITATION", "Active"
         ]);
@@ -347,8 +349,50 @@ class MemberController extends BaseController {
     public function importExcel() {
         $this->isAdmin();
         $this->ensureMemberSchema();
+        @set_time_limit(0);
+
+        // #region debug-point member-import-timeout-import
+        $dbgEnabled = false;
+        $dbgRunId = '';
+        $dbgStart = 0.0;
+        $dbgLogPath = '';
+        try {
+            $dbgFlag = ROOT_PATH . '/debug-member-import-timeout.md';
+            if (file_exists($dbgFlag)) {
+                $dbgEnabled = true;
+                $dbgStart = microtime(true);
+                $dbgRunId = bin2hex(random_bytes(6));
+                $dir = ROOT_PATH . '/.dbg';
+                if (!is_dir($dir)) {
+                    @mkdir($dir, 0777, true);
+                }
+                $dbgLogPath = $dir . '/trae-debug-log-member-import-timeout.ndjson';
+            }
+        } catch (Throwable $e) {
+            $dbgEnabled = false;
+        }
+        $dbgWrite = function (string $point, array $data = []) use (&$dbgEnabled, &$dbgLogPath, &$dbgRunId) {
+            if (!$dbgEnabled || $dbgLogPath === '') return;
+            $evt = [
+                'ts' => date('c'),
+                'sessionId' => 'member-import-timeout',
+                'runId' => $dbgRunId,
+                'point' => $point,
+                'route' => (string)($_SERVER['REQUEST_URI'] ?? ''),
+                'data' => $data
+            ];
+            @file_put_contents($dbgLogPath, json_encode($evt, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+        };
+        // #endregion debug-point member-import-timeout-import
         
         if (!isset($_FILES['excel_file']) || $_FILES['excel_file']['error'] !== UPLOAD_ERR_OK) {
+            // #region debug-point member-import-timeout-upload
+            $dbgWrite('upload_invalid', [
+                'error' => isset($_FILES['excel_file']) ? (int)($_FILES['excel_file']['error'] ?? -1) : null,
+                'name' => isset($_FILES['excel_file']) ? (string)($_FILES['excel_file']['name'] ?? '') : null,
+                'size' => isset($_FILES['excel_file']) ? (int)($_FILES['excel_file']['size'] ?? 0) : null,
+            ]);
+            // #endregion debug-point member-import-timeout-upload
             Session::flash('error', 'Please select a valid CSV/Excel file');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/members");
@@ -361,6 +405,9 @@ class MemberController extends BaseController {
         try {
             $result = $this->readMemberImportRows($file, $originalName);
         } catch (Throwable $e) {
+            // #region debug-point member-import-timeout-parse-fail
+            $dbgWrite('parse_fail', ['message' => (string)$e->getMessage()]);
+            // #endregion debug-point member-import-timeout-parse-fail
             Session::flash('error', $e->getMessage() ?: 'Failed to read import file.');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/members");
@@ -370,16 +417,83 @@ class MemberController extends BaseController {
         $header = (array)($result['header'] ?? []);
         $rows = (array)($result['rows'] ?? []);
         $headerIndex = $this->buildImportHeaderIndex($header);
-        
+        $hasStaysAt = array_key_exists('STAYS AT', $headerIndex);
+
+        // #region debug-point member-import-timeout-start
+        $dbgWrite('start', [
+            'file' => $originalName,
+            'rows' => count($rows),
+            'has_stays_at' => $hasStaysAt,
+        ]);
+        // #endregion debug-point member-import-timeout-start
+
+        $db = Database::getInstance();
         $memberModel = new Member();
+
+        $clustersByName = [];
+        $departmentsByName = [];
+        try {
+            foreach (($db->fetchAll("SELECT id, name FROM clusters") ?: []) as $c) {
+                $n = strtoupper(trim((string)($c['name'] ?? '')));
+                if ($n !== '') {
+                    $clustersByName[$n] = (int)($c['id'] ?? 0);
+                }
+            }
+            foreach (($db->fetchAll("SELECT id, name FROM departments") ?: []) as $d) {
+                $n = strtoupper(trim((string)($d['name'] ?? '')));
+                if ($n !== '') {
+                    $departmentsByName[$n] = (int)($d['id'] ?? 0);
+                }
+            }
+        } catch (Throwable $e) {
+        }
+
+        $existingBio = [];
+        $existingPhone = [];
+        $existingNameDob = [];
+        try {
+            $existingRows = $db->fetchAll("SELECT bio_id, phone, first_name, last_name, date_of_birth FROM members") ?: [];
+            foreach ($existingRows as $r) {
+                $bio = strtoupper(trim((string)($r['bio_id'] ?? '')));
+                if ($bio !== '') {
+                    $existingBio[$bio] = true;
+                }
+                $p = $this->normalizePhoneDigits((string)($r['phone'] ?? ''));
+                if ($p !== '') {
+                    $existingPhone[$p] = true;
+                }
+                $dob = trim((string)($r['date_of_birth'] ?? ''));
+                if ($dob !== '') {
+                    $fn = strtoupper(trim((string)($r['first_name'] ?? '')));
+                    $ln = strtoupper(trim((string)($r['last_name'] ?? '')));
+                    if ($fn !== '' && $ln !== '') {
+                        $existingNameDob[$fn . '|' . $ln . '|' . $dob] = true;
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+        }
+
+        $conn = $db->getConnection();
+        $useSavepoints = true;
+        try {
+            if (!$conn->inTransaction()) {
+                $conn->beginTransaction();
+            }
+        } catch (Throwable $e) {
+            $useSavepoints = false;
+        }
+
         $count = 0;
         $skipped = 0;
         $errors = [];
+        $rowIndex = 0;
 
         foreach ($rows as $data) {
             if (!is_array($data)) {
                 continue;
             }
+            $rowIndex++;
 
             $rowLabel = trim((string)($this->getImportValue($data, $headerIndex, 'FIRST NAME', 1) ?? '') . ' ' . (string)($this->getImportValue($data, $headerIndex, 'LAST NAME', 2) ?? ''));
             try {
@@ -394,20 +508,88 @@ class MemberController extends BaseController {
                 $nationalityRaw = $this->getImportValue($data, $headerIndex, 'NATIONALITY', 5);
                 $phoneRaw = $this->getImportValue($data, $headerIndex, 'PHONE NUMBER', 6);
                 $addressRaw = $this->getImportValue($data, $headerIndex, 'ADDRESS', 7);
-                $homeTownRaw = $this->getImportValue($data, $headerIndex, 'HOME TOWN', 8);
-                $maritalRaw = $this->getImportValue($data, $headerIndex, 'MARITAL STATUS', 9);
-                $spouseRaw = $this->getImportValue($data, $headerIndex, 'NAME OF SPOUSE', 10);
-                $motherRaw = $this->getImportValue($data, $headerIndex, 'MOTHER NAME', 11);
-                $fatherRaw = $this->getImportValue($data, $headerIndex, 'FATHER NAME', 12);
-                $baptizedRaw = $this->getImportValue($data, $headerIndex, 'HAVE YOU BEEN BAPTIZED', 13);
-                $baptismPastorRaw = $this->getImportValue($data, $headerIndex, 'PASTOR WHO BAPTIZED YOU AND CHURCH', 14);
-                $workingRaw = $this->getImportValue($data, $headerIndex, 'ARE YOU WORKING', 15);
-                $workNameRaw = $this->getImportValue($data, $headerIndex, 'NAME OF WORK', 16);
-                $groupRaw = $this->getImportValue($data, $headerIndex, 'GROUP', 17);
-                $departmentRaw = $this->getImportValue($data, $headerIndex, 'DEPARTMENT', 18);
-                $statusRaw = $this->getImportValue($data, $headerIndex, 'INITIAL STATUS', 19);
+                $staysAtRaw = $this->getImportValue($data, $headerIndex, 'STAYS AT', $hasStaysAt ? 8 : -1);
+                $homeTownRaw = $this->getImportValue($data, $headerIndex, 'HOME TOWN', $hasStaysAt ? 9 : 8);
+                $maritalRaw = $this->getImportValue($data, $headerIndex, 'MARITAL STATUS', $hasStaysAt ? 10 : 9);
+                $spouseRaw = $this->getImportValue($data, $headerIndex, 'NAME OF SPOUSE', $hasStaysAt ? 11 : 10);
+                $motherRaw = $this->getImportValue($data, $headerIndex, 'MOTHER NAME', $hasStaysAt ? 12 : 11);
+                $fatherRaw = $this->getImportValue($data, $headerIndex, 'FATHER NAME', $hasStaysAt ? 13 : 12);
+                $baptizedRaw = $this->getImportValue($data, $headerIndex, 'HAVE YOU BEEN BAPTIZED', $hasStaysAt ? 14 : 13);
+                $baptismPastorRaw = $this->getImportValue($data, $headerIndex, 'PASTOR WHO BAPTIZED YOU AND CHURCH', $hasStaysAt ? 15 : 14);
+                $workingRaw = $this->getImportValue($data, $headerIndex, 'ARE YOU WORKING', $hasStaysAt ? 16 : 15);
+                $workNameRaw = $this->getImportValue($data, $headerIndex, 'NAME OF WORK', $hasStaysAt ? 17 : 16);
+                $groupRaw = $this->getImportValue($data, $headerIndex, 'GROUP', $hasStaysAt ? 18 : 17);
+                $departmentRaw = $this->getImportValue($data, $headerIndex, 'DEPARTMENT', $hasStaysAt ? 19 : 18);
+                $statusRaw = $this->getImportValue($data, $headerIndex, 'INITIAL STATUS', $hasStaysAt ? 20 : 19);
                 if ($statusRaw === null) {
-                    $statusRaw = $this->getImportValue($data, $headerIndex, 'MEMBERSHIP STATUS', 19);
+                    $statusRaw = $this->getImportValue($data, $headerIndex, 'MEMBERSHIP STATUS', $hasStaysAt ? 20 : 19);
+                }
+                if ($staysAtRaw === null && !$hasStaysAt) {
+                    $staysAtRaw = null;
+                }
+
+                $bioNorm = strtoupper(trim((string)($this->uppercaseImportedValue($bioRaw) ?? '')));
+                if ($bioNorm !== '' && isset($existingBio[$bioNorm])) {
+                    $skipped++;
+                    continue;
+                }
+                $phoneNorm = $this->normalizePhoneDigits((string)($this->uppercaseImportedValue($phoneRaw) ?? ''));
+                if ($phoneNorm !== '' && isset($existingPhone[$phoneNorm])) {
+                    $skipped++;
+                    continue;
+                }
+                $dobNorm = (string)($this->normalizeImportedDate($dobRaw) ?? '');
+                if ($dobNorm !== '') {
+                    $fnKey = strtoupper(trim((string)($this->uppercaseImportedValue($firstNameRaw) ?? '')));
+                    $lnKey = strtoupper(trim((string)($this->uppercaseImportedValue($lastNameRaw) ?? '')));
+                    if ($fnKey !== '' && $lnKey !== '' && isset($existingNameDob[$fnKey . '|' . $lnKey . '|' . $dobNorm])) {
+                        $skipped++;
+                        continue;
+                    }
+                }
+
+                $clusterId = null;
+                $grp = strtoupper(trim((string)$groupRaw));
+                if ($grp !== '') {
+                    $candidates = [$grp];
+                    if (preg_match('/\(([^)]+)\)/', $grp, $m)) {
+                        $inside = strtoupper(trim((string)($m[1] ?? '')));
+                        if ($inside !== '') $candidates[] = $inside;
+                    }
+                    if (strpos($grp, '-') !== false) {
+                        $parts = array_values(array_filter(array_map('trim', explode('-', $grp))));
+                        if (!empty($parts)) {
+                            $candidates[] = strtoupper((string)end($parts));
+                        }
+                    }
+                    foreach (array_values(array_unique($candidates)) as $cand) {
+                        if (isset($clustersByName[$cand]) && (int)$clustersByName[$cand] > 0) {
+                            $clusterId = (int)$clustersByName[$cand];
+                            break;
+                        }
+                    }
+                }
+
+                $deptAssignment = ['primary_department_id' => null, 'additional_department_ids' => []];
+                $rawDept = trim((string)$departmentRaw);
+                if ($rawDept !== '') {
+                    $parts = preg_split('/\s*[,;|]\s*/', $rawDept);
+                    $names = array_values(array_filter(array_map('trim', (array)$parts)));
+                    $deptIds = [];
+                    foreach ($names as $n) {
+                        $k = strtoupper(trim((string)$n));
+                        if ($k !== '' && isset($departmentsByName[$k]) && (int)$departmentsByName[$k] > 0) {
+                            $deptIds[] = (int)$departmentsByName[$k];
+                        }
+                    }
+                    $deptIds = array_values(array_unique($deptIds));
+                    $deptAssignment['primary_department_id'] = array_shift($deptIds) ?: null;
+                    $deptAssignment['additional_department_ids'] = $deptIds;
+                }
+
+                if ($useSavepoints) {
+                    $sp = 'sp_import_' . $rowIndex;
+                    $db->rawExec("SAVEPOINT {$sp}");
                 }
 
                 $memberData = [
@@ -416,10 +598,11 @@ class MemberController extends BaseController {
                     'first_name' => $this->uppercaseImportedValue($firstNameRaw ?? ''),
                     'last_name' => $this->uppercaseImportedValue($lastNameRaw ?? ''),
                     'gender' => $this->normalizeImportedOption($genderRaw ?? 'male', 'male'),
-                    'date_of_birth' => $this->normalizeImportedDate($dobRaw),
+                    'date_of_birth' => $dobNorm !== '' ? $dobNorm : null,
                     'nationality' => $this->uppercaseImportedValue($nationalityRaw),
                     'phone' => $this->uppercaseImportedValue($phoneRaw),
                     'address' => $this->uppercaseImportedValue($addressRaw),
+                    'stays_at' => $this->uppercaseImportedValue($staysAtRaw),
                     'home_town' => $this->uppercaseImportedValue($homeTownRaw),
                     'marital_status' => $this->normalizeImportedOption($maritalRaw ?? 'single', 'single'),
                     'spouse_name' => $this->uppercaseImportedValue($spouseRaw),
@@ -429,33 +612,46 @@ class MemberController extends BaseController {
                     'baptism_pastor_church' => $this->uppercaseImportedValue($baptismPastorRaw),
                     'currently_working' => $this->toBooleanValue($workingRaw ?? false),
                     'work_name' => $this->uppercaseImportedValue($workNameRaw),
-                    'cluster_id' => $this->resolveClusterIdByName($groupRaw),
+                    'cluster_id' => $clusterId,
                     'membership_status' => $this->normalizeMembershipStatus($statusRaw),
                     'join_date' => date('Y-m-d')
                 ];
 
-                $departmentAssignment = $this->resolveDepartmentAssignmentsByName($departmentRaw);
-                $memberData['department_id'] = $departmentAssignment['primary_department_id'];
-
-                $existing = $this->findExistingMember($memberModel, $memberData);
-                if ($existing) {
-                    $skipped++;
-                    continue;
-                }
-
-                $conn = Database::getInstance()->getConnection();
-                $conn->beginTransaction();
+                $memberData['department_id'] = $deptAssignment['primary_department_id'];
                 $memberId = $memberModel->create($memberData);
-                $memberModel->syncAdditionalDepartments($memberId, $departmentAssignment['additional_department_ids'], $memberData['department_id'] ?? null);
-                $conn->commit();
+                $memberModel->syncAdditionalDepartments($memberId, $deptAssignment['additional_department_ids'], $memberData['department_id'] ?? null);
                 $count++;
+
+                if ($bioNorm !== '') $existingBio[$bioNorm] = true;
+                if ($phoneNorm !== '') $existingPhone[$phoneNorm] = true;
+                if ($dobNorm !== '' && isset($fnKey, $lnKey) && $fnKey !== '' && $lnKey !== '') {
+                    $existingNameDob[$fnKey . '|' . $lnKey . '|' . $dobNorm] = true;
+                }
             } catch (Exception $e) {
-                $conn = Database::getInstance()->getConnection();
-                if ($conn->inTransaction()) {
-                    $conn->rollBack();
+                if ($useSavepoints) {
+                    try {
+                        $sp = 'sp_import_' . $rowIndex;
+                        $db->rawExec("ROLLBACK TO SAVEPOINT {$sp}");
+                    } catch (Throwable $e2) {
+                        if ($conn->inTransaction()) {
+                            $conn->rollBack();
+                        }
+                        $useSavepoints = false;
+                    }
                 }
                 $errors[] = "Error importing row for " . ($rowLabel !== '' ? $rowLabel : 'Unknown') . ": " . $e->getMessage();
             }
+
+            // #region debug-point member-import-timeout-progress
+            if ($dbgEnabled && (($count + $skipped + count($errors)) % 50) === 0) {
+                $dbgWrite('progress', [
+                    'imported' => $count,
+                    'skipped' => $skipped,
+                    'errors' => count($errors),
+                    'ms' => (int)round((microtime(true) - $dbgStart) * 1000)
+                ]);
+            }
+            // #endregion debug-point member-import-timeout-progress
         }
 
         if ($count > 0) {
@@ -473,6 +669,22 @@ class MemberController extends BaseController {
             $more = count($errors) - 1;
             Session::flash('error', $more > 0 ? ($first . " (+{$more} more)") : $first);
         }
+
+        try {
+            if ($conn->inTransaction()) {
+                $conn->commit();
+            }
+        } catch (Throwable $e) {
+        }
+
+        // #region debug-point member-import-timeout-done
+        $dbgWrite('done', [
+            'imported' => $count,
+            'skipped' => $skipped,
+            'errors' => count($errors),
+            'ms' => $dbgStart > 0 ? (int)round((microtime(true) - $dbgStart) * 1000) : null
+        ]);
+        // #endregion debug-point member-import-timeout-done
 
         $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
         header("Location: $base/members");

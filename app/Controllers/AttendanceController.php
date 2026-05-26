@@ -13,13 +13,24 @@ class AttendanceController extends BaseController {
         }
         $this->ensureAttendanceSchema();
         $attendanceModel = new Attendance();
+        $mode = $this->getAttendanceMode();
+        $biotimeConfigured = $this->isBioTimeConfigured();
+        $cloudUrl = rtrim(trim((string)AppConfig::getSetting('attendance_cloud_url', '')), '/');
+        $cloudTokenSet = trim((string)AppConfig::getSetting('attendance_cloud_token', '')) !== '';
+        $cloudConfigured = ($cloudUrl !== '' && $cloudTokenSet);
+        $cloudLastPushedAt = trim((string)AppConfig::getSetting('attendance_cloud_last_pushed_at', ''));
         
         View::render('attendance.index', [
             'title' => 'Attendance Management',
             'attendance_rate' => $attendanceModel->getAttendanceRate(),
             'recent_records' => $attendanceModel->getRecentWithMember(50),
-            'biotime_configured' => $this->getBioTimeUrl() !== '' && ($this->getBioTimeToken() !== '' || ($this->getBioTimeUsername() !== '' && $this->getBioTimePassword() !== '')),
-            'biotime_url' => $this->getBioTimeUrl()
+            'attendance_mode' => $mode,
+            'biotime_configured' => $biotimeConfigured,
+            'biotime_url' => $this->getBioTimeUrl(),
+            'cloud_configured' => $cloudConfigured,
+            'cloud_url' => $cloudUrl,
+            'cloud_last_pushed_at' => $cloudLastPushedAt,
+            'cloud_last_result' => (string)Session::flash('attendance_cloud_last_result')
         ]);
     }
 
@@ -28,6 +39,12 @@ class AttendanceController extends BaseController {
             Session::flash('error', 'Unauthorized access.');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/dashboard");
+            exit;
+        }
+        if ($this->getAttendanceMode() !== 'manual') {
+            Session::flash('error', 'Manual attendance is disabled. Change Attendance Mode in Settings.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
             exit;
         }
         $this->ensureAttendanceSchema();
@@ -43,6 +60,12 @@ class AttendanceController extends BaseController {
             Session::flash('error', 'Unauthorized access.');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/dashboard");
+            exit;
+        }
+        if ($this->getAttendanceMode() !== 'manual') {
+            Session::flash('error', 'Manual attendance is disabled. Change Attendance Mode in Settings.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
             exit;
         }
         $this->ensureAttendanceSchema();
@@ -114,6 +137,12 @@ class AttendanceController extends BaseController {
             header("Location: $base/dashboard");
             exit;
         }
+        if ($this->getAttendanceMode() !== 'biotime') {
+            Session::flash('error', 'BioTime sync is disabled. Change Attendance Mode to BioTime in Settings.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
         $this->ensureAttendanceSchema();
 
         if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
@@ -124,7 +153,7 @@ class AttendanceController extends BaseController {
 
         $biotimeUrl = $this->getBioTimeUrl();
         if ($biotimeUrl === '') {
-            Session::flash('error', 'BioTime is not configured. Set BIOTIME_URL.');
+            Session::flash('error', 'BioTime is not configured. Set it in Settings → Attendance.');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/attendance");
             exit;
@@ -185,7 +214,7 @@ class AttendanceController extends BaseController {
             $biotimeUser = $this->getBioTimeUsername();
             $biotimePass = $this->getBioTimePassword();
             if ($biotimeUser === '' || $biotimePass === '') {
-                Session::flash('error', 'BioTime is not configured. Set BIOTIME_TOKEN or BIOTIME_USERNAME/BIOTIME_PASSWORD.');
+                Session::flash('error', 'BioTime is not configured. Set token or username/password in Settings → Attendance.');
                 $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
                 header("Location: $base/attendance");
                 exit;
@@ -200,6 +229,16 @@ class AttendanceController extends BaseController {
         }
 
         $itemsResult = $this->biotimeFetchTransactions($biotimeUrl, $token, $startStr, $endStr);
+        if (!($itemsResult['ok'] ?? false) && (int)($itemsResult['status'] ?? 0) === 401) {
+            $biotimeUser = $this->getBioTimeUsername();
+            $biotimePass = $this->getBioTimePassword();
+            if ($biotimeUser !== '' && $biotimePass !== '') {
+                $freshToken = $this->biotimeGetToken($biotimeUrl, $biotimeUser, $biotimePass);
+                if ($freshToken !== '') {
+                    $itemsResult = $this->biotimeFetchTransactions($biotimeUrl, $freshToken, $startStr, $endStr);
+                }
+            }
+        }
         if (!($itemsResult['ok'] ?? false)) {
             $err = trim((string)($itemsResult['error'] ?? 'Failed to fetch BioTime transactions.'));
             Session::flash('error', $err !== '' ? $err : 'Failed to fetch BioTime transactions.');
@@ -264,6 +303,278 @@ class AttendanceController extends BaseController {
         exit;
     }
 
+    public function quick()
+    {
+        if (Session::get('user_role') === 'dept_head') {
+            Session::flash('error', 'Unauthorized access.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/dashboard");
+            exit;
+        }
+        $mode = $this->getAttendanceMode();
+        if (!in_array($mode, ['qrcode', 'link'], true)) {
+            Session::flash('error', 'Quick attendance is disabled. Change Attendance Mode in Settings.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+        $this->ensureAttendanceSchema();
+
+        $serviceDate = trim((string)($_GET['service_date'] ?? date('Y-m-d')));
+        $serviceType = trim((string)($_GET['service_type'] ?? 'Sunday Service'));
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            $serviceDate = date('Y-m-d');
+        }
+        if ($serviceType === '') {
+            $serviceType = 'Sunday Service';
+        }
+        $serviceType = mb_substr($serviceType, 0, 100);
+
+        View::render('attendance.quick', [
+            'title' => 'Quick Attendance',
+            'attendance_mode' => $mode,
+            'service_date' => $serviceDate,
+            'service_type' => $serviceType
+        ]);
+    }
+
+    public function quickMark()
+    {
+        if (Session::get('user_role') === 'dept_head') {
+            Session::flash('error', 'Unauthorized access.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/dashboard");
+            exit;
+        }
+        $mode = $this->getAttendanceMode();
+        if (!in_array($mode, ['qrcode', 'link'], true)) {
+            Session::flash('error', 'Quick attendance is disabled. Change Attendance Mode in Settings.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+        $this->ensureAttendanceSchema();
+
+        if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+
+        $serviceDate = trim((string)($_POST['service_date'] ?? ''));
+        $serviceType = trim((string)($_POST['service_type'] ?? ''));
+        $code = strtoupper(trim((string)($_POST['member_code'] ?? '')));
+
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            Session::flash('error', 'Invalid service date.');
+            $this->redirectQuick($serviceDate, $serviceType);
+        }
+        if ($serviceType === '') {
+            Session::flash('error', 'Service type is required.');
+            $this->redirectQuick($serviceDate, $serviceType);
+        }
+        $serviceType = mb_substr($serviceType, 0, 100);
+
+        if ($code === '') {
+            Session::flash('error', 'Enter a Member Code or Bio ID.');
+            $this->redirectQuick($serviceDate, $serviceType);
+        }
+
+        $memberModel = new Member();
+        $member = $memberModel->findByBioId($code);
+        if (!$member) {
+            $member = $memberModel->findByMemberCode($code);
+        }
+        if (!$member) {
+            Session::flash('error', 'Member not found for: ' . $code);
+            $this->redirectQuick($serviceDate, $serviceType);
+        }
+
+        $memberId = (int)($member['id'] ?? 0);
+        if ($memberId <= 0) {
+            Session::flash('error', 'Member not found.');
+            $this->redirectQuick($serviceDate, $serviceType);
+        }
+
+        $attendanceModel = new Attendance();
+        if ($attendanceModel->existsForMemberService($memberId, $serviceDate, $serviceType)) {
+            Session::flash('warning', 'Already marked present: ' . trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? '')));
+            $this->redirectQuick($serviceDate, $serviceType);
+        }
+
+        $attendanceModel->create([
+            'member_id' => $memberId,
+            'service_date' => $serviceDate,
+            'service_type' => $serviceType,
+            'status' => 'Present',
+            'source' => $mode,
+            'bio_id' => trim((string)($member['bio_id'] ?? '')) !== '' ? strtoupper(trim((string)($member['bio_id'] ?? ''))) : null,
+            'imported_at' => date('Y-m-d H:i:s')
+        ]);
+
+        Session::flash('success', 'Marked present: ' . trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? '')));
+        $this->redirectQuick($serviceDate, $serviceType);
+    }
+
+    public function pushOnline()
+    {
+        $this->isAdmin();
+        $this->ensureAttendanceSchema();
+
+        if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+
+        $cloudUrl = rtrim(trim((string)AppConfig::getSetting('attendance_cloud_url', '')), '/');
+        $token = trim((string)AppConfig::getSetting('attendance_cloud_token', ''));
+        if ($cloudUrl === '' || $token === '') {
+            Session::flash('error', 'Online push is not configured. Set Online Base URL and Sync Token in Settings → Attendance.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+        if (!function_exists('curl_init')) {
+            Session::flash('error', 'cURL is not available on this server. Enable PHP curl extension.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+
+        $serviceDate = trim((string)($_POST['service_date'] ?? ''));
+        $serviceType = trim((string)($_POST['service_type'] ?? ''));
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            Session::flash('error', 'Invalid service date.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+        if ($serviceType === '') {
+            Session::flash('error', 'Service type is required.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+        $serviceType = mb_substr($serviceType, 0, 100);
+
+        $attendanceModel = new Attendance();
+        $rows = $attendanceModel->getForServiceWithMember($serviceDate, $serviceType);
+        if (empty($rows)) {
+            Session::flash('warning', 'No attendance records found for this service to push.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+
+        $records = [];
+        foreach ($rows as $r) {
+            $memberCode = trim((string)($r['member_code'] ?? ''));
+            $bioId = trim((string)($r['bio_id'] ?? ''));
+            $status = trim((string)($r['status'] ?? 'Present'));
+            $source = trim((string)($r['source'] ?? 'manual'));
+            $records[] = [
+                'member_code' => $memberCode !== '' ? $memberCode : null,
+                'bio_id' => $bioId !== '' ? $bioId : null,
+                'service_date' => (string)$serviceDate,
+                'service_type' => (string)$serviceType,
+                'status' => $status !== '' ? $status : 'Present',
+                'source' => $source !== '' ? $source : 'manual',
+                'device_time' => $r['device_time'] ?? null,
+                'device_serial' => $r['device_serial'] ?? null,
+                'punch_type' => $r['punch_type'] ?? null,
+                'imported_at' => $r['imported_at'] ?? null,
+            ];
+        }
+
+        $payload = json_encode([
+            'service_date' => $serviceDate,
+            'service_type' => $serviceType,
+            'sent_at' => date('c'),
+            'records' => $records
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!is_string($payload)) {
+            Session::flash('error', 'Failed to encode payload.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+
+        $url = $cloudUrl . '/api/attendance/import';
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'X-Sync-Token: ' . $token,
+        ]);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+
+        $body = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $err = curl_error($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($errno !== 0) {
+            Session::flash('error', 'Online push failed: ' . $err);
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+
+        $json = json_decode((string)$body, true);
+        if ($code < 200 || $code >= 300 || !is_array($json) || empty($json['ok'])) {
+            $msg = '';
+            if (is_array($json)) {
+                $msg = trim((string)($json['error'] ?? $json['message'] ?? ''));
+            }
+            if ($msg === '') {
+                $msg = 'Online push failed (HTTP ' . $code . ').';
+            }
+            Session::flash('error', $msg);
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+
+        $imported = (int)($json['imported'] ?? 0);
+        $duplicates = (int)($json['duplicates'] ?? 0);
+        $unmatched = (int)($json['unmatched'] ?? 0);
+        $resultText = "Pushed to online: $imported imported, $duplicates duplicates, $unmatched unmatched.";
+        Session::flash('attendance_cloud_last_result', $resultText);
+
+        try {
+            $db = Database::getInstance();
+            $exists = $db->fetch("SELECT id FROM settings WHERE key_name = ? LIMIT 1", ['attendance_cloud_last_pushed_at']);
+            if ($exists) {
+                $db->query("UPDATE settings SET value = ? WHERE key_name = ?", [date('c'), 'attendance_cloud_last_pushed_at']);
+            } else {
+                $db->query("INSERT INTO settings (key_name, value) VALUES (?, ?)", ['attendance_cloud_last_pushed_at', date('c')]);
+            }
+            AppConfig::reset();
+        } catch (Throwable $e) {
+        }
+
+        Session::flash('success', 'Online push completed.');
+        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+        header("Location: $base/attendance");
+        exit;
+    }
+
+    private function redirectQuick(string $serviceDate, string $serviceType): void
+    {
+        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+        $qs = http_build_query([
+            'service_date' => $serviceDate !== '' ? $serviceDate : date('Y-m-d'),
+            'service_type' => $serviceType !== '' ? $serviceType : 'Sunday Service',
+        ]);
+        header("Location: $base/attendance/quick?$qs");
+        exit;
+    }
+
     private function ensureAttendanceSchema(): void
     {
         $db = Database::getInstance();
@@ -286,28 +597,69 @@ class AttendanceController extends BaseController {
         });
     }
 
+    private function getAttendanceMode(): string
+    {
+        $mode = strtolower(trim((string)AppConfig::getSetting('attendance_mode', 'manual')));
+        if (!in_array($mode, ['manual', 'biotime', 'qrcode', 'link'], true)) {
+            $mode = 'manual';
+        }
+        return $mode;
+    }
+
+    private function isBioTimeConfigured(): bool
+    {
+        $url = $this->getBioTimeUrl();
+        if ($url === '') {
+            return false;
+        }
+        if ($this->getBioTimeToken() !== '') {
+            return true;
+        }
+        return ($this->getBioTimeUsername() !== '' && $this->getBioTimePassword() !== '');
+    }
+
     private function getBioTimeUrl(): string
     {
+        $v = rtrim(trim((string)AppConfig::getSetting('attendance_biotime_url', '')), '/');
+        if ($v !== '') {
+            return $v;
+        }
         return rtrim(trim((string)Env::get('BIOTIME_URL', '')), '/');
     }
 
     private function getBioTimeUsername(): string
     {
+        $v = trim((string)AppConfig::getSetting('attendance_biotime_username', ''));
+        if ($v !== '') {
+            return $v;
+        }
         return trim((string)Env::get('BIOTIME_USERNAME', ''));
     }
 
     private function getBioTimePassword(): string
     {
+        $v = trim((string)AppConfig::getSetting('attendance_biotime_password', ''));
+        if ($v !== '') {
+            return $v;
+        }
         return trim((string)Env::get('BIOTIME_PASSWORD', ''));
     }
 
     private function getBioTimeTimezone(): string
     {
+        $v = trim((string)AppConfig::getSetting('attendance_biotime_tz', ''));
+        if ($v !== '') {
+            return $v;
+        }
         return trim((string)Env::get('BIOTIME_TZ', 'Africa/Accra'));
     }
 
     private function getBioTimeToken(): string
     {
+        $v = trim((string)AppConfig::getSetting('attendance_biotime_token', ''));
+        if ($v !== '') {
+            return $v;
+        }
         return trim((string)Env::get('BIOTIME_TOKEN', ''));
     }
 
@@ -374,7 +726,7 @@ class AttendanceController extends BaseController {
                 if ($err === '') {
                     $err = 'BioTime request failed.';
                 }
-                return ['ok' => false, 'error' => $err];
+                return ['ok' => false, 'error' => $err, 'status' => (int)($res['status'] ?? 0)];
             }
 
             $json = $res['json'] ?? null;

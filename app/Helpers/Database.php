@@ -136,8 +136,51 @@ class Database {
     }
 
     public function query($sql, $params = []) {
+        // #region debug-point member-import-timeout-db-query
+        $dbgEnabled = false;
+        $dbgStart = 0.0;
+        try {
+            $dbgFlag = defined('ROOT_PATH') ? (ROOT_PATH . '/debug-member-import-timeout.md') : '';
+            if ($dbgFlag !== '' && file_exists($dbgFlag)) {
+                $dbgEnabled = true;
+                $dbgStart = microtime(true);
+            }
+        } catch (Throwable $e) {
+            $dbgEnabled = false;
+        }
+        // #endregion debug-point member-import-timeout-db-query
+
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
+
+        // #region debug-point member-import-timeout-db-query-end
+        if ($dbgEnabled) {
+            try {
+                $elapsedMs = (int)round((microtime(true) - $dbgStart) * 1000);
+                if ($elapsedMs >= 250) {
+                    $dir = ROOT_PATH . '/.dbg';
+                    if (!is_dir($dir)) {
+                        @mkdir($dir, 0777, true);
+                    }
+                    $path = $dir . '/trae-debug-log-member-import-timeout.ndjson';
+                    $sqlOneLine = preg_replace('/\s+/', ' ', trim((string)$sql));
+                    $evt = [
+                        'ts' => date('c'),
+                        'sessionId' => 'member-import-timeout',
+                        'point' => 'db_query',
+                        'ms' => $elapsedMs,
+                        'driver' => $this->driver,
+                        'route' => (string)($_SERVER['REQUEST_URI'] ?? ''),
+                        'sql' => is_string($sqlOneLine) ? mb_substr($sqlOneLine, 0, 220) : '',
+                        'params_count' => is_array($params) ? count($params) : 0
+                    ];
+                    @file_put_contents($path, json_encode($evt, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+                }
+            } catch (Throwable $e) {
+            }
+        }
+        // #endregion debug-point member-import-timeout-db-query-end
+
         return $stmt;
     }
 

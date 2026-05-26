@@ -58,6 +58,158 @@ class AuthController {
         exit;
     }
 
+    public function importAttendance()
+    {
+        $expectedToken = trim((string)AppConfig::getSetting('attendance_cloud_token', ''));
+        $provided = '';
+        if (isset($_SERVER['HTTP_X_SYNC_TOKEN'])) {
+            $provided = trim((string)$_SERVER['HTTP_X_SYNC_TOKEN']);
+        } elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            $auth = trim((string)$_SERVER['HTTP_AUTHORIZATION']);
+            if (stripos($auth, 'Bearer ') === 0) {
+                $provided = trim(substr($auth, 7));
+            }
+        }
+
+        if ($expectedToken === '' || $provided === '' || !hash_equals($expectedToken, $provided)) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+            http_response_code(405);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'Method Not Allowed'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $raw = file_get_contents('php://input');
+        $json = json_decode((string)$raw, true);
+        if (!is_array($json)) {
+            http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'Invalid JSON'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $serviceDate = trim((string)($json['service_date'] ?? ''));
+        $serviceType = trim((string)($json['service_type'] ?? ''));
+        $records = $json['records'] ?? [];
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate) || $serviceType === '' || !is_array($records)) {
+            http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'Invalid payload'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $serviceType = function_exists('mb_substr') ? mb_substr($serviceType, 0, 100) : substr($serviceType, 0, 100);
+
+        require_once __DIR__ . '/../Models/Attendance.php';
+        require_once __DIR__ . '/../Models/Member.php';
+        $this->ensureAttendanceSchema();
+
+        $attendanceModel = new Attendance();
+        $memberModel = new Member();
+
+        $imported = 0;
+        $duplicates = 0;
+        $unmatched = 0;
+        $invalid = 0;
+
+        foreach ($records as $r) {
+            if (!is_array($r)) {
+                $invalid++;
+                continue;
+            }
+            $bioId = strtoupper(trim((string)($r['bio_id'] ?? '')));
+            $memberCode = strtoupper(trim((string)($r['member_code'] ?? '')));
+            $status = trim((string)($r['status'] ?? 'Present'));
+            $source = trim((string)($r['source'] ?? 'push'));
+
+            if ($bioId === '' && $memberCode === '') {
+                $invalid++;
+                continue;
+            }
+
+            $member = null;
+            if ($bioId !== '') {
+                $member = $memberModel->findByBioId($bioId);
+            }
+            if (!$member && $memberCode !== '') {
+                $member = $memberModel->findByMemberCode($memberCode);
+            }
+            if (!$member) {
+                $unmatched++;
+                continue;
+            }
+
+            $memberId = (int)($member['id'] ?? 0);
+            if ($memberId <= 0) {
+                $unmatched++;
+                continue;
+            }
+
+            if ($attendanceModel->existsForMemberService($memberId, $serviceDate, $serviceType)) {
+                $duplicates++;
+                continue;
+            }
+
+            $payload = json_encode($r, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (!is_string($payload)) {
+                $payload = null;
+            }
+
+            $attendanceModel->create([
+                'member_id' => $memberId,
+                'service_date' => $serviceDate,
+                'service_type' => $serviceType,
+                'status' => $status !== '' ? $status : 'Present',
+                'source' => $source !== '' ? $source : 'push',
+                'bio_id' => $bioId !== '' ? $bioId : null,
+                'device_time' => $r['device_time'] ?? null,
+                'device_serial' => $r['device_serial'] ?? null,
+                'punch_type' => $r['punch_type'] ?? null,
+                'raw_payload' => $payload,
+                'imported_at' => date('Y-m-d H:i:s')
+            ]);
+            $imported++;
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'imported' => $imported,
+            'duplicates' => $duplicates,
+            'unmatched' => $unmatched,
+            'invalid' => $invalid
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    private function ensureAttendanceSchema(): void
+    {
+        $db = Database::getInstance();
+        SchemaState::once('attendance_schema_v1', function () use ($db) {
+            $columns = [
+                'source' => "ALTER TABLE attendance ADD COLUMN source VARCHAR(20) NULL",
+                'bio_id' => "ALTER TABLE attendance ADD COLUMN bio_id VARCHAR(50) NULL",
+                'device_time' => "ALTER TABLE attendance ADD COLUMN device_time " . ($db->isPgsql() ? 'TIMESTAMP' : 'DATETIME') . " NULL",
+                'device_serial' => "ALTER TABLE attendance ADD COLUMN device_serial VARCHAR(60) NULL",
+                'punch_type' => "ALTER TABLE attendance ADD COLUMN punch_type VARCHAR(30) NULL",
+                'raw_payload' => "ALTER TABLE attendance ADD COLUMN raw_payload " . ($db->isPgsql() ? 'TEXT' : 'TEXT') . " NULL",
+                'imported_at' => "ALTER TABLE attendance ADD COLUMN imported_at " . ($db->isPgsql() ? 'TIMESTAMP' : 'DATETIME') . " NULL"
+            ];
+
+            foreach ($columns as $columnName => $sql) {
+                if (!$db->columnExists('attendance', $columnName)) {
+                    $db->query($sql);
+                }
+            }
+        });
+    }
+
+
     public function forgotPassword() {
         if (Auth::check()) {
             header('Location: dashboard');
