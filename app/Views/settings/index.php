@@ -525,8 +525,8 @@
                 </div>
                 <div class="min-w-0">
                     <h4 class="text-xl font-black text-white tracking-tight">Supabase Connection</h4>
-                    <p class="text-[10px] font-black uppercase tracking-widest mt-1 <?php echo (!empty($dbConfig['pdo_pgsql']) && !empty($dbConfig['pgsql'])) ? 'text-emerald-400' : 'text-rose-400'; ?>">
-                        <?php echo (!empty($dbConfig['pdo_pgsql']) && !empty($dbConfig['pgsql'])) ? 'POSTGRES EXTENSIONS READY' : 'POSTGRES EXTENSIONS MISSING'; ?>
+                    <p class="text-[10px] font-black uppercase tracking-widest mt-1 <?php echo !empty($dbConfig['pdo_pgsql']) ? 'text-emerald-400' : 'text-rose-400'; ?>">
+                        <?php echo !empty($dbConfig['pdo_pgsql']) ? 'POSTGRES PDO READY' : 'POSTGRES PDO MISSING'; ?>
                     </p>
                 </div>
             </div>
