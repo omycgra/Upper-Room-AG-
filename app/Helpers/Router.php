@@ -41,6 +41,7 @@ class Router {
         $this->add('attendance/quick', 'AttendanceController@quick');
         $this->add('attendance/quickMark', 'AttendanceController@quickMark');
         $this->add('attendance/pushOnline', 'AttendanceController@pushOnline');
+        $this->add('attendance/download', 'AttendanceController@download');
         $this->add('api/attendance/import', 'AuthController@importAttendance');
         $this->add('finance', 'FinanceController@index');
         $this->add('finance/add', 'FinanceController@add');
@@ -127,7 +128,7 @@ class Router {
 
         if (array_key_exists($uri, $this->routes)) {
             // Basic Authentication Guard
-            if (!in_array($uri, ['login', 'forgot-password', 'reset-password', 'api/attendance/import'], true) && !Auth::check()) {
+            if (!in_array($uri, ['login', 'forgot-password', 'reset-password', 'api/attendance/import', 'attendance/quick', 'attendance/quickMark'], true) && !Auth::check()) {
                 $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
                 header("Location: $base/login");
                 exit;

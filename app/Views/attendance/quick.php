@@ -38,7 +38,7 @@
                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Type</p>
                 <p class="mt-2 text-sm font-black text-slate-200"><?php echo htmlspecialchars($serviceType); ?></p>
             </div>
-            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Tip: use Member Code or Bio ID</p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Present: 7:00–10:30 • Late: 10:31–12:00 • Absent: after 12:00</p>
         </div>
     </div>
 
@@ -48,7 +48,7 @@
                 <i class="fas fa-bolt text-accent text-sm"></i>
             </div>
             <div class="min-w-0">
-                <h4 class="text-xl font-black text-white tracking-tight">Mark Present</h4>
+                <h4 class="text-xl font-black text-white tracking-tight">Mark Attendance</h4>
                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1">Enter code and submit (duplicates are blocked)</p>
             </div>
         </div>
@@ -67,10 +67,9 @@
 
             <div class="flex justify-end">
                 <button type="submit" class="h-12 px-8 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
-                    Mark Present
+                    Submit
                 </button>
             </div>
         </form>
     </div>
 </div>
-

@@ -562,11 +562,20 @@
                             <th class="px-6 py-5">Requested By</th>
                             <th class="px-6 py-5">Amount</th>
                             <th class="px-6 py-5 hidden lg:table-cell">Purpose</th>
+                            <th class="px-6 py-5">Status</th>
                             <th class="px-6 py-5 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-white/[0.02]">
                         <?php foreach ($pendingDeptExpenseRequests as $r): ?>
+                            <?php
+                                $financeApproved = !empty($r['approved_by']);
+                                $pastorApproved = !empty($r['pastor_approved_by']);
+                                $approvalLabel = 'Pending';
+                                if ($pastorApproved && !$financeApproved) $approvalLabel = 'Approved by pastor, waiting for head of finance';
+                                if ($financeApproved && !$pastorApproved) $approvalLabel = 'Approved by head of finance, waiting for pastor';
+                                if ($financeApproved && $pastorApproved) $approvalLabel = 'Approved by pastor + head of finance';
+                            ?>
                             <tr class="hover:bg-white/[0.03] transition-all duration-300">
                                 <td class="px-6 py-5">
                                     <p class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($r['department_name'] ?? ''); ?></p>
@@ -581,21 +590,28 @@
                                 <td class="px-6 py-5 hidden lg:table-cell">
                                     <p class="text-xs font-bold text-slate-400 max-w-xl"><?php echo htmlspecialchars($r['purpose'] ?? ''); ?></p>
                                 </td>
+                                <td class="px-6 py-5">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400"><?php echo htmlspecialchars($approvalLabel); ?></p>
+                                </td>
                                 <td class="px-6 py-5 text-right">
                                     <div class="flex items-center justify-end gap-2">
                                         <?php if (Auth::isFinanceHead()): ?>
-                                            <form action="<?php echo BASE_URL; ?>/finance/approveDepartmentExpenseRequest" method="POST">
-                                                <input type="hidden" name="request_id" value="<?php echo (int)($r['id'] ?? 0); ?>">
-                                                <button type="submit" class="h-10 px-4 rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 transition-all border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest">
-                                                    Approve
-                                                </button>
-                                            </form>
-                                            <form action="<?php echo BASE_URL; ?>/finance/rejectDepartmentExpenseRequest" method="POST">
-                                                <input type="hidden" name="request_id" value="<?php echo (int)($r['id'] ?? 0); ?>">
-                                                <button type="submit" class="h-10 px-4 rounded-xl bg-rose-500/15 text-rose-300 hover:bg-rose-500/20 transition-all border border-rose-500/20 text-[10px] font-black uppercase tracking-widest">
-                                                    Reject
-                                                </button>
-                                            </form>
+                                            <?php if (empty($r['approved_by'])): ?>
+                                                <form action="<?php echo BASE_URL; ?>/finance/approveDepartmentExpenseRequest" method="POST">
+                                                    <input type="hidden" name="request_id" value="<?php echo (int)($r['id'] ?? 0); ?>">
+                                                    <button type="submit" class="h-10 px-4 rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 transition-all border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest">
+                                                        Approve
+                                                    </button>
+                                                </form>
+                                                <form action="<?php echo BASE_URL; ?>/finance/rejectDepartmentExpenseRequest" method="POST">
+                                                    <input type="hidden" name="request_id" value="<?php echo (int)($r['id'] ?? 0); ?>">
+                                                    <button type="submit" class="h-10 px-4 rounded-xl bg-rose-500/15 text-rose-300 hover:bg-rose-500/20 transition-all border border-rose-500/20 text-[10px] font-black uppercase tracking-widest">
+                                                        Reject
+                                                    </button>
+                                                </form>
+                                            <?php else: ?>
+                                                <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">Awaiting pastor approval</span>
+                                            <?php endif; ?>
                                         <?php else: ?>
                                             <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">Awaiting head approval</span>
                                         <?php endif; ?>

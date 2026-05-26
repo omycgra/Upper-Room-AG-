@@ -113,6 +113,14 @@ class DashboardController extends BaseController {
 
         if ($isVisitationTeam) {
             $assignedVisitors = $visitorModel->getVisitationAssignments(null, (int)Session::get('user_id'));
+            $allVisitorsTotal = 0;
+            try {
+                $db = Database::getInstance();
+                $row = $db->fetch("SELECT COUNT(*) as c FROM visitors");
+                $allVisitorsTotal = (int)($row['c'] ?? 0);
+            } catch (Throwable $e) {
+                $allVisitorsTotal = 0;
+            }
             $pending = 0;
             $completed = 0;
             $firstTime = 0;
@@ -137,6 +145,7 @@ class DashboardController extends BaseController {
             $visitationContext = [
                 'visitors' => $assignedVisitors,
                 'summary' => [
+                    'all_visitors_total' => $allVisitorsTotal,
                     'assigned_total' => count($assignedVisitors),
                     'pending_total' => $pending,
                     'completed_total' => $completed,

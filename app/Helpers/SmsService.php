@@ -47,7 +47,7 @@ class SmsService {
         $debugRunId = 'pre-' . bin2hex(random_bytes(6));
         $message = trim((string)$message);
         if ($message === '') {
-            return ['status' => 'error', 'message' => 'Message cannot be empty'];
+            return ['status' => 'error', 'message' => 'Message cannot be empty', 'debug_run_id' => $debugRunId];
         }
 
         $inputRecipients = (array)$recipients;
@@ -65,7 +65,7 @@ class SmsService {
         }, $inputRecipients);
         $recipients = array_values(array_unique(array_filter($normalizedList)));
         if (count($recipients) === 0) {
-            return ['status' => 'error', 'message' => 'No valid recipients'];
+            return ['status' => 'error', 'message' => 'No valid recipients', 'debug_run_id' => $debugRunId];
         }
 
         // #region debug-point sms-1
@@ -110,7 +110,8 @@ class SmsService {
             if (($batchResults['sent'] ?? 0) > 0 && ($batchResults['failed'] ?? 0) === 0) {
                 return [
                     'status' => 'success',
-                    'message' => 'SMS sent successfully to ' . (int)$batchResults['sent'] . ' recipients'
+                    'message' => 'SMS sent successfully to ' . (int)$batchResults['sent'] . ' recipients',
+                    'debug_run_id' => $debugRunId
                 ];
             }
 
@@ -118,13 +119,15 @@ class SmsService {
                 $detail = !empty($batchResults['last_error']) ? (' (' . $batchResults['last_error'] . ')') : '';
                 return [
                     'status' => 'error',
-                    'message' => 'SMS failed to send. Please verify your SMS API configuration.' . $detail
+                    'message' => 'SMS failed to send. Please verify your SMS API configuration.' . $detail,
+                    'debug_run_id' => $debugRunId
                 ];
             }
 
             return [
                 'status' => 'warning',
-                'message' => 'SMS sent to ' . (int)$batchResults['sent'] . ' recipients. Failed: ' . (int)$batchResults['failed']
+                'message' => 'SMS sent to ' . (int)$batchResults['sent'] . ' recipients. Failed: ' . (int)$batchResults['failed'],
+                'debug_run_id' => $debugRunId
             ];
         }
 
@@ -184,7 +187,8 @@ class SmsService {
         if ($results['sent'] > 0 && $results['failed'] === 0) {
             return [
                 'status' => 'success',
-                'message' => 'SMS sent successfully to ' . $results['sent'] . ' recipients'
+                'message' => 'SMS sent successfully to ' . $results['sent'] . ' recipients',
+                'debug_run_id' => $debugRunId
             ];
         }
 
@@ -192,13 +196,15 @@ class SmsService {
             $detail = $lastError ? (' (' . $lastError . ')') : '';
             return [
                 'status' => 'error',
-                'message' => 'SMS failed to send. Please verify your SMS API configuration.' . $detail
+                'message' => 'SMS failed to send. Please verify your SMS API configuration.' . $detail,
+                'debug_run_id' => $debugRunId
             ];
         }
 
         return [
             'status' => 'warning',
-            'message' => 'SMS sent to ' . $results['sent'] . ' recipients. Failed: ' . $results['failed']
+            'message' => 'SMS sent to ' . $results['sent'] . ' recipients. Failed: ' . $results['failed'],
+            'debug_run_id' => $debugRunId
         ];
     }
 

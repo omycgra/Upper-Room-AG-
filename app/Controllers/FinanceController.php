@@ -436,6 +436,8 @@ class FinanceController extends BaseController {
             $smsResult = FinancePaymentSmsService::sendForTransaction((int)$financeId);
             if (($smsResult['status'] ?? '') === 'sent') {
                 $successMessage = (string)($smsResult['message'] ?? $successMessage);
+            } elseif (($smsResult['status'] ?? '') === 'duplicate') {
+                $successMessage .= '. ' . trim((string)($smsResult['message'] ?? 'SMS was already sent for this transaction.'));
             } elseif (($smsResult['status'] ?? '') === 'error' || ($smsResult['status'] ?? '') === 'skipped') {
                 $successMessage .= '. ' . trim((string)($smsResult['message'] ?? ''));
             }
@@ -1031,7 +1033,9 @@ class FinanceController extends BaseController {
 
     public function approveDepartmentExpenseRequest() {
         $this->ensureFinanceSchema();
-        if (!Auth::isFinanceHead()) {
+        $isFinanceHead = Auth::isFinanceHead();
+        $isPastor = Auth::isPastor();
+        if (!$isFinanceHead && !$isPastor) {
             if ($this->wantsJsonResponse()) {
                 $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
             }
@@ -1079,6 +1083,31 @@ class FinanceController extends BaseController {
                 exit;
             }
 
+            $now = date('Y-m-d H:i:s');
+            $actorId = (int)Session::get('user_id');
+            $actorName = trim((string)Session::get('user_name', ''));
+            $actorName = $actorName !== '' ? $actorName : ($isPastor ? 'Pastor' : 'Finance Head');
+
+            $financeApprovedBy = (int)($request['approved_by'] ?? 0);
+            $pastorApprovedBy = (int)($request['pastor_approved_by'] ?? 0);
+
+            if ($isFinanceHead && $financeApprovedBy > 0) {
+                if ($this->wantsJsonResponse()) {
+                    $this->jsonResponse(['success' => false, 'message' => 'This request was already approved by the finance head.'], 400);
+                }
+                Session::flash('error', 'This request was already approved by the finance head.');
+                header('Location: ' . BASE_URL . '/finance');
+                exit;
+            }
+            if ($isPastor && $pastorApprovedBy > 0) {
+                if ($this->wantsJsonResponse()) {
+                    $this->jsonResponse(['success' => false, 'message' => 'This request was already approved by the pastor.'], 400);
+                }
+                Session::flash('error', 'This request was already approved by the pastor.');
+                header('Location: ' . BASE_URL . '/pastor');
+                exit;
+            }
+
             $amount = (float)($request['amount'] ?? 0);
             if ($amount <= 0) {
                 if ($this->wantsJsonResponse()) {
@@ -1089,39 +1118,73 @@ class FinanceController extends BaseController {
                 exit;
             }
 
-            $txNo = $this->generateTransactionNumber($db);
-            $desc = 'DEPARTMENT EXPENSE REQUEST: ' . trim((string)($request['purpose'] ?? ''));
-            $ref = 'DEP-REQ-' . $requestId;
-            $today = date('Y-m-d');
-            $recordedBy = (int)Session::get('user_id');
-
-            $financeId = null;
-            if ($db->isPgsql()) {
-                $row = $db->fetch(
-                    "INSERT INTO finances (transaction_number, member_id, department_id, transaction_type, amount, payment_method, transaction_date, description, reference_no, recorded_by)
-                     VALUES (?, NULL, ?, 'Expense', ?, 'Cash', ?, ?, ?, ?)
-                     RETURNING id",
-                    [$txNo, (int)$request['department_id'], $amount, $today, $desc, $ref, $recordedBy]
+            if ($isFinanceHead) {
+                $db->query(
+                    "UPDATE department_expense_requests
+                     SET approved_by = ?,
+                         approved_at = ?
+                     WHERE id = ?",
+                    [$actorId, $now, $requestId]
                 );
-                $financeId = (int)($row['id'] ?? 0);
             } else {
                 $db->query(
-                    "INSERT INTO finances (transaction_number, member_id, department_id, transaction_type, amount, payment_method, transaction_date, description, reference_no, recorded_by)
-                     VALUES (?, NULL, ?, 'Expense', ?, 'Cash', ?, ?, ?, ?)",
-                    [$txNo, (int)$request['department_id'], $amount, $today, $desc, $ref, $recordedBy]
+                    "UPDATE department_expense_requests
+                     SET pastor_approved_by = ?,
+                         pastor_approved_at = ?
+                     WHERE id = ?",
+                    [$actorId, $now, $requestId]
                 );
-                $financeId = (int)$db->getConnection()->lastInsertId();
             }
 
-            $db->query(
-                "UPDATE department_expense_requests
-                 SET status = 'approved',
-                     approved_by = ?,
-                     approved_at = ?,
-                     finance_id = ?
-                 WHERE id = ?",
-                [$recordedBy, date('Y-m-d H:i:s'), $financeId ?: null, $requestId]
+            $request = $db->fetch(
+                "SELECT r.*, d.name as department_name, u.name, u.phone
+                 FROM department_expense_requests r
+                 INNER JOIN departments d ON d.id = r.department_id
+                 LEFT JOIN users u ON u.id = r.requested_by
+                 WHERE r.id = ?
+                 LIMIT 1",
+                [$requestId]
             );
+
+            $financeApprovedBy = (int)($request['approved_by'] ?? 0);
+            $pastorApprovedBy = (int)($request['pastor_approved_by'] ?? 0);
+            $financeId = (int)($request['finance_id'] ?? 0);
+            $isFullyApproved = ($financeApprovedBy > 0 && $pastorApprovedBy > 0);
+
+            if ($isFullyApproved && strtolower((string)($request['status'] ?? '')) === 'pending') {
+                if ($financeId <= 0) {
+                    $txNo = $this->generateTransactionNumber($db);
+                    $desc = 'DEPARTMENT EXPENSE REQUEST: ' . trim((string)($request['purpose'] ?? ''));
+                    $ref = 'DEP-REQ-' . $requestId;
+                    $today = date('Y-m-d');
+                    $recordedBy = $financeApprovedBy;
+
+                    if ($db->isPgsql()) {
+                        $row = $db->fetch(
+                            "INSERT INTO finances (transaction_number, member_id, department_id, transaction_type, amount, payment_method, transaction_date, description, reference_no, recorded_by)
+                             VALUES (?, NULL, ?, 'Expense', ?, 'Cash', ?, ?, ?, ?)
+                             RETURNING id",
+                            [$txNo, (int)$request['department_id'], $amount, $today, $desc, $ref, $recordedBy]
+                        );
+                        $financeId = (int)($row['id'] ?? 0);
+                    } else {
+                        $db->query(
+                            "INSERT INTO finances (transaction_number, member_id, department_id, transaction_type, amount, payment_method, transaction_date, description, reference_no, recorded_by)
+                             VALUES (?, NULL, ?, 'Expense', ?, 'Cash', ?, ?, ?, ?)",
+                            [$txNo, (int)$request['department_id'], $amount, $today, $desc, $ref, $recordedBy]
+                        );
+                        $financeId = (int)$db->getConnection()->lastInsertId();
+                    }
+                }
+
+                $db->query(
+                    "UPDATE department_expense_requests
+                     SET status = 'approved',
+                         finance_id = ?
+                     WHERE id = ?",
+                    [$financeId ?: null, $requestId]
+                );
+            }
 
             AuditLog::log('Approved department expense request', 'department_expense_requests', $requestId, null, [
                 'department_id' => (int)$request['department_id'],
@@ -1137,8 +1200,12 @@ class FinanceController extends BaseController {
                 $toName = $toName !== '' ? $toName : 'Department Head';
                 $deptName = trim((string)($request['department_name'] ?? 'Department'));
                 $purpose = trim((string)($request['purpose'] ?? ''));
-                $approvedByName = trim((string)Session::get('user_name', 'Finance Head'));
-                $msg = 'Dear ' . $toName . ', your expense request for ' . $deptName . ' of ' . $currency . ' ' . number_format($amount, 2) . ' has been APPROVED by ' . $approvedByName . '.';
+                $msg = 'Dear ' . $toName . ', your expense request for ' . $deptName . ' of ' . $currency . ' ' . number_format($amount, 2) . ' has been APPROVED by ' . $actorName . '.';
+                if (!$isFullyApproved) {
+                    $msg .= $isFinanceHead ? ' Waiting for Pastor approval.' : ' Waiting for Head of Finance approval.';
+                } else {
+                    $msg .= ' Final status: APPROVED.';
+                }
                 if ($purpose !== '') {
                     $msg .= ' Purpose: ' . $purpose . '.';
                 }
@@ -1147,9 +1214,9 @@ class FinanceController extends BaseController {
             }
 
             if ($this->wantsJsonResponse()) {
-                $this->jsonResponse(['success' => true, 'message' => 'Expense request approved.']);
+                $this->jsonResponse(['success' => true, 'message' => $isFullyApproved ? 'Expense request fully approved.' : 'Expense request approved. Waiting for the other approval.']);
             }
-            Session::flash('success', 'Expense request approved and recorded. Department balance is updated automatically.');
+            Session::flash('success', $isFullyApproved ? 'Expense request fully approved and recorded.' : 'Approval saved. Waiting for the other approval.');
         } catch (Throwable $e) {
             if ($this->wantsJsonResponse()) {
                 $this->jsonResponse(['success' => false, 'message' => 'Error approving expense request.'], 500);
@@ -1157,13 +1224,15 @@ class FinanceController extends BaseController {
             Session::flash('error', 'Error approving expense request: ' . $e->getMessage());
         }
 
-        header('Location: ' . BASE_URL . '/finance');
+        header('Location: ' . ($isPastor ? (BASE_URL . '/pastor') : (BASE_URL . '/finance')));
         exit;
     }
 
     public function rejectDepartmentExpenseRequest() {
         $this->ensureFinanceSchema();
-        if (!Auth::isFinanceHead()) {
+        $isFinanceHead = Auth::isFinanceHead();
+        $isPastor = Auth::isPastor();
+        if (!$isFinanceHead && !$isPastor) {
             if ($this->wantsJsonResponse()) {
                 $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
             }
@@ -1207,7 +1276,7 @@ class FinanceController extends BaseController {
                     $this->jsonResponse(['success' => false, 'message' => 'This expense request is no longer pending.'], 400);
                 }
                 Session::flash('error', 'This expense request is no longer pending.');
-                header('Location: ' . BASE_URL . '/finance');
+                header('Location: ' . ($isPastor ? (BASE_URL . '/pastor') : (BASE_URL . '/finance')));
                 exit;
             }
 
@@ -1231,7 +1300,7 @@ class FinanceController extends BaseController {
                 $toName = $toName !== '' ? $toName : 'Department Head';
                 $deptName = trim((string)($request['department_name'] ?? 'Department'));
                 $purpose = trim((string)($request['purpose'] ?? ''));
-                $rejectedByName = trim((string)Session::get('user_name', 'Finance Head'));
+                $rejectedByName = trim((string)Session::get('user_name', $isPastor ? 'Pastor' : 'Finance Head'));
                 $msg = 'Dear ' . $toName . ', your expense request for ' . $deptName . ' of ' . $currency . ' ' . number_format($amount, 2) . ' has been REJECTED by ' . $rejectedByName . '.';
                 if ($purpose !== '') {
                     $msg .= ' Purpose: ' . $purpose . '.';
@@ -1250,7 +1319,7 @@ class FinanceController extends BaseController {
             Session::flash('error', 'Error rejecting expense request: ' . $e->getMessage());
         }
 
-        header('Location: ' . BASE_URL . '/finance');
+        header('Location: ' . ($isPastor ? (BASE_URL . '/pastor') : (BASE_URL . '/finance')));
         exit;
     }
 
@@ -1485,6 +1554,8 @@ class FinanceController extends BaseController {
                             purpose TEXT NOT NULL,
                             status VARCHAR(20) NOT NULL DEFAULT 'pending',
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            pastor_approved_by INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                            pastor_approved_at TIMESTAMPTZ NULL,
                             approved_by INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
                             approved_at TIMESTAMPTZ NULL,
                             rejected_by INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
@@ -1505,6 +1576,8 @@ class FinanceController extends BaseController {
                             purpose TEXT NOT NULL,
                             status VARCHAR(20) NOT NULL DEFAULT 'pending',
                             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            pastor_approved_by INT NULL,
+                            pastor_approved_at DATETIME NULL,
                             approved_by INT NULL,
                             approved_at DATETIME NULL,
                             rejected_by INT NULL,
@@ -1515,6 +1588,7 @@ class FinanceController extends BaseController {
                             KEY idx_dep_expense_requests_created_at (created_at),
                             CONSTRAINT fk_dep_expense_requests_department FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE,
                             CONSTRAINT fk_dep_expense_requests_requested_by FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_dep_expense_requests_pastor_approved_by FOREIGN KEY (pastor_approved_by) REFERENCES users(id) ON DELETE SET NULL,
                             CONSTRAINT fk_dep_expense_requests_approved_by FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL,
                             CONSTRAINT fk_dep_expense_requests_rejected_by FOREIGN KEY (rejected_by) REFERENCES users(id) ON DELETE SET NULL,
                             CONSTRAINT fk_dep_expense_requests_finance FOREIGN KEY (finance_id) REFERENCES finances(id) ON DELETE SET NULL
@@ -1524,6 +1598,12 @@ class FinanceController extends BaseController {
             }
 
             $deptExpenseColumns = [
+                'pastor_approved_by' => $db->isPgsql()
+                    ? "ALTER TABLE department_expense_requests ADD COLUMN pastor_approved_by INTEGER NULL REFERENCES users(id) ON DELETE SET NULL"
+                    : "ALTER TABLE department_expense_requests ADD COLUMN pastor_approved_by INT NULL",
+                'pastor_approved_at' => $db->isPgsql()
+                    ? "ALTER TABLE department_expense_requests ADD COLUMN pastor_approved_at TIMESTAMPTZ NULL"
+                    : "ALTER TABLE department_expense_requests ADD COLUMN pastor_approved_at DATETIME NULL",
                 'approved_by' => $db->isPgsql()
                     ? "ALTER TABLE department_expense_requests ADD COLUMN approved_by INTEGER NULL REFERENCES users(id) ON DELETE SET NULL"
                     : "ALTER TABLE department_expense_requests ADD COLUMN approved_by INT NULL",

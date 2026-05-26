@@ -2,7 +2,21 @@
 
 class BaseController {
     public function __construct() {
-        if (!Auth::check()) {
+        $currentRoute = trim($_SERVER['REQUEST_URI'] ?? '', '/');
+        $scriptName = trim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+        if ($scriptName && strpos($currentRoute, $scriptName) === 0) {
+            $currentRoute = trim(substr($currentRoute, strlen($scriptName)), '/');
+        }
+        if (($pos = strpos($currentRoute, '?')) !== false) {
+            $currentRoute = substr($currentRoute, 0, $pos);
+        }
+
+        $publicRoutes = [
+            'attendance/quick',
+            'attendance/quickMark'
+        ];
+
+        if (!Auth::check() && !in_array($currentRoute, $publicRoutes, true)) {
             header('Location: login');
             exit;
         }
@@ -77,6 +91,9 @@ class BaseController {
                 'finance/store',
                 'finance/requestChange',
                 'finance/updateTransaction',
+                'sms',
+                'sms/balance',
+                'sms/send',
                 'chat/threads',
                 'chat/messages',
                 'chat/send',
@@ -92,6 +109,7 @@ class BaseController {
                 $allowed[] = 'finance/pendingApprovals';
                 $allowed[] = 'reports';
                 $allowed[] = 'reports/download';
+                $allowed[] = 'debug/sms-logs';
             }
             $this->guardRoute($currentRoute, $allowed);
         }
@@ -100,6 +118,8 @@ class BaseController {
             $allowed = [
                 'dashboard',
                 'logout',
+                'attendance',
+                'attendance/download',
                 'visitors',
                 'visitors/details',
                 'visitors/approve',
@@ -120,6 +140,10 @@ class BaseController {
                 'visitors',
                 'visitors/details',
                 'visitors/assign',
+                'attendance',
+                'attendance/download',
+                'finance/approveDepartmentExpenseRequest',
+                'finance/rejectDepartmentExpenseRequest',
                 'reports',
                 'reports/download',
                 'chat/threads',

@@ -57,6 +57,8 @@
                     : 'bg-amber-500/15 text-amber-100 border-amber-400/20';
                 $isApproved = !empty($visitor['approved_at']);
                 $isAssignedToMe = (int)($visitor['assigned_to'] ?? 0) === $meId;
+                        $canVisitationViewDetails = (!$isVisitationTeam) || ($isAssignedToMe && $isApproved);
+                        $canVisitationSeeContact = (!$isVisitationTeam) || ($isAssignedToMe && $isApproved);
             ?>
             <div class="glass-card rounded-[2rem] p-5 border-white/10">
                 <div class="flex items-start justify-between gap-4">
@@ -81,7 +83,7 @@
                     <div class="rounded-2xl bg-white/5 border border-white/5 px-4 py-3">
                         <p class="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">Contact</p>
                         <p class="text-white font-bold mt-2">
-                            <?php if ($isVisitationTeam && !$isApproved): ?>
+                            <?php if (!$canVisitationSeeContact): ?>
                                 Hidden until approved
                             <?php else: ?>
                                 <?php echo !empty($visitor['phone']) ? $visitor['phone'] : (!empty($visitor['email']) ? $visitor['email'] : 'Not provided'); ?>
@@ -100,10 +102,14 @@
                                             Approve
                                         </button>
                                     </form>
-                                <?php elseif ($isApproved): ?>
+                                <?php elseif ($canVisitationViewDetails): ?>
                                     <a href="<?php echo BASE_URL; ?>/visitors/details?id=<?php echo (int)$visitor['id']; ?>" class="inline-flex h-10 items-center justify-center rounded-xl bg-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest border border-white/10">
                                         View Details
                                     </a>
+                                <?php else: ?>
+                                    <div class="inline-flex h-10 items-center justify-center rounded-xl bg-white/5 text-slate-400 font-black text-[10px] uppercase tracking-widest border border-white/10">
+                                        Not yours
+                                    </div>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <div class="flex flex-col sm:flex-row gap-2">
@@ -159,6 +165,8 @@
                                 : 'bg-amber-500/15 text-amber-100 border-amber-400/20';
                             $isApproved = !empty($visitor['approved_at']);
                             $isAssignedToMe = (int)($visitor['assigned_to'] ?? 0) === $meId;
+                            $canVisitationViewDetails = (!$isVisitationTeam) || ($isAssignedToMe && $isApproved);
+                            $canVisitationSeeContact = (!$isVisitationTeam) || ($isAssignedToMe && $isApproved);
                         ?>
                         <tr class="hover:bg-white/[0.03] transition-colors">
                             <td class="px-6 py-5">
@@ -172,9 +180,9 @@
                                 <div class="text-xs text-slate-500 mt-2"><?php echo !empty($visitor['is_first_time']) ? 'First-time visitor' : 'Returning visitor'; ?></div>
                             </td>
                             <td class="px-6 py-5 text-sm font-bold text-slate-300">
-                                <?php if ($isVisitationTeam && !$isApproved): ?>
+                                <?php if (!$canVisitationSeeContact): ?>
                                     <div class="text-slate-400">Hidden until approved</div>
-                                    <div class="text-xs text-slate-600 mt-2">Approve to view contact</div>
+                                    <div class="text-xs text-slate-600 mt-2">Visible only for your approved assignments</div>
                                 <?php else: ?>
                                     <div><?php echo !empty($visitor['phone']) ? $visitor['phone'] : 'No phone'; ?></div>
                                     <div class="text-xs text-slate-500 mt-2"><?php echo !empty($visitor['preferred_contact_method']) ? $visitor['preferred_contact_method'] : (!empty($visitor['email']) ? $visitor['email'] : 'No preferred method'); ?></div>
@@ -199,10 +207,14 @@
                                                     Approve
                                                 </button>
                                             </form>
-                                        <?php elseif ($isApproved): ?>
+                                        <?php elseif ($canVisitationViewDetails): ?>
                                             <a href="<?php echo BASE_URL; ?>/visitors/details?id=<?php echo (int)$visitor['id']; ?>" class="h-9 px-4 inline-flex items-center justify-center rounded-xl bg-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest border border-white/10">
                                                 Details
                                             </a>
+                                        <?php else: ?>
+                                            <span class="h-9 px-4 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-500 font-black text-[10px] uppercase tracking-widest border border-white/10">
+                                                Not yours
+                                            </span>
                                         <?php endif; ?>
                                     <?php else: ?>
                                         <div class="inline-flex items-center gap-2 justify-end">

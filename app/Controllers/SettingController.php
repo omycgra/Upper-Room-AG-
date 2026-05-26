@@ -627,7 +627,10 @@ class SettingController extends BaseController {
     }
 
     public function updateSmsConfig() {
-        $this->isAdmin();
+        if (!Auth::isAdmin() && !Auth::isFinanceHead()) {
+            Session::flash('error', 'Unauthorized access.');
+            $this->redirectSettings();
+        }
 
         $db = Database::getInstance();
 

@@ -19,18 +19,45 @@ class AttendanceController extends BaseController {
         $cloudTokenSet = trim((string)AppConfig::getSetting('attendance_cloud_token', '')) !== '';
         $cloudConfigured = ($cloudUrl !== '' && $cloudTokenSet);
         $cloudLastPushedAt = trim((string)AppConfig::getSetting('attendance_cloud_last_pushed_at', ''));
+
+        $serviceDate = trim((string)($_GET['service_date'] ?? date('Y-m-d')));
+        $serviceType = trim((string)($_GET['service_type'] ?? 'Sunday Service'));
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            $serviceDate = date('Y-m-d');
+        }
+        if ($serviceType === '') {
+            $serviceType = 'Sunday Service';
+        }
+        $serviceType = mb_substr($serviceType, 0, 100);
+
+        $dailyReport = $this->buildServiceAttendanceReport($serviceDate, $serviceType);
+
+        $recent = $attendanceModel->getRecentWithMember(50);
+        foreach ($recent as &$r) {
+            $checkInRaw = trim((string)($r['device_time'] ?? ''));
+            if ($checkInRaw === '') {
+                $checkInRaw = trim((string)($r['imported_at'] ?? ''));
+            }
+            $r['computed_status'] = $this->computeAttendanceStatus($r['service_date'] ?? '', $checkInRaw !== '' ? $checkInRaw : null);
+        }
+        unset($r);
         
         View::render('attendance.index', [
             'title' => 'Attendance Management',
             'attendance_rate' => $attendanceModel->getAttendanceRate(),
-            'recent_records' => $attendanceModel->getRecentWithMember(50),
+            'recent_records' => $recent,
             'attendance_mode' => $mode,
             'biotime_configured' => $biotimeConfigured,
             'biotime_url' => $this->getBioTimeUrl(),
             'cloud_configured' => $cloudConfigured,
             'cloud_url' => $cloudUrl,
             'cloud_last_pushed_at' => $cloudLastPushedAt,
-            'cloud_last_result' => (string)Session::flash('attendance_cloud_last_result')
+            'cloud_last_result' => (string)Session::flash('attendance_cloud_last_result'),
+            'service_date' => $serviceDate,
+            'service_type' => $serviceType,
+            'daily_report' => $dailyReport,
+            'can_manage_attendance' => Auth::isAdmin(),
+            'can_download_attendance' => (Auth::isAdmin() || Auth::isPastor() || Auth::isVisitationTeam())
         ]);
     }
 
@@ -60,6 +87,12 @@ class AttendanceController extends BaseController {
             Session::flash('error', 'Unauthorized access.');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/dashboard");
+            exit;
+        }
+        if (!Auth::isAdmin()) {
+            Session::flash('error', 'Unauthorized access.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
             exit;
         }
         if ($this->getAttendanceMode() !== 'manual') {
@@ -97,6 +130,9 @@ class AttendanceController extends BaseController {
         
         $created = 0;
         $skipped = 0;
+        $tz = $this->resolveAttendanceTimezone();
+        $deviceTime = (new DateTimeImmutable($serviceDate . ' 08:00:00', $tz))->format('Y-m-d H:i:s');
+        $status = $this->computeAttendanceStatus($serviceDate, $deviceTime);
         foreach ($memberIds as $memberId) {
             $memberId = (int)$memberId;
             if ($memberId <= 0) {
@@ -110,8 +146,9 @@ class AttendanceController extends BaseController {
                 'member_id' => $memberId,
                 'service_date' => $serviceDate,
                 'service_type' => $serviceType,
-                'status' => 'Present',
+                'status' => $status,
                 'source' => 'manual',
+                'device_time' => $deviceTime,
                 'imported_at' => date('Y-m-d H:i:s')
             ]);
             $created++;
@@ -135,6 +172,12 @@ class AttendanceController extends BaseController {
             Session::flash('error', 'Unauthorized access.');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/dashboard");
+            exit;
+        }
+        if (!Auth::isAdmin()) {
+            Session::flash('error', 'Unauthorized access.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
             exit;
         }
         if ($this->getAttendanceMode() !== 'biotime') {
@@ -255,6 +298,7 @@ class AttendanceController extends BaseController {
         $unmatched = 0;
         $invalid = 0;
 
+        $bestByMemberId = [];
         foreach ($items as $tx) {
             $parsed = $this->biotimeParseTransaction($tx);
             $bioId = strtoupper(trim((string)($parsed['bio_id'] ?? '')));
@@ -269,24 +313,47 @@ class AttendanceController extends BaseController {
                 continue;
             }
 
+            $deviceTime = trim((string)($parsed['device_time'] ?? ''));
+            if ($deviceTime === '') {
+                $invalid++;
+                continue;
+            }
+
+            if (!isset($bestByMemberId[$memberId])) {
+                $bestByMemberId[$memberId] = ['tx' => $tx, 'parsed' => $parsed, 'bio_id' => $bioId];
+            } else {
+                $bestTime = (string)($bestByMemberId[$memberId]['parsed']['device_time'] ?? '');
+                if ($bestTime === '' || strcmp($deviceTime, $bestTime) < 0) {
+                    $bestByMemberId[$memberId] = ['tx' => $tx, 'parsed' => $parsed, 'bio_id' => $bioId];
+                }
+            }
+        }
+
+        foreach ($bestByMemberId as $memberId => $picked) {
+            $memberId = (int)$memberId;
             if ($attendanceModel->existsForMemberService($memberId, $serviceDate, $serviceType)) {
                 $duplicates++;
                 continue;
             }
 
-            $payload = json_encode($tx, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $parsed = (array)($picked['parsed'] ?? []);
+            $bioId = (string)($picked['bio_id'] ?? '');
+            $payload = json_encode($picked['tx'] ?? null, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if (!is_string($payload)) {
                 $payload = null;
             }
+
+            $deviceTime = trim((string)($parsed['device_time'] ?? ''));
+            $status = $this->computeAttendanceStatus($serviceDate, $deviceTime !== '' ? $deviceTime : null);
 
             $attendanceModel->create([
                 'member_id' => $memberId,
                 'service_date' => $serviceDate,
                 'service_type' => $serviceType,
-                'status' => 'Present',
+                'status' => $status,
                 'source' => 'biotime',
                 'bio_id' => $bioId,
-                'device_time' => $parsed['device_time'] ?? null,
+                'device_time' => $deviceTime !== '' ? $deviceTime : null,
                 'device_serial' => $parsed['device_serial'] ?? null,
                 'punch_type' => $parsed['punch_type'] ?? null,
                 'raw_payload' => $payload,
@@ -398,22 +465,130 @@ class AttendanceController extends BaseController {
 
         $attendanceModel = new Attendance();
         if ($attendanceModel->existsForMemberService($memberId, $serviceDate, $serviceType)) {
-            Session::flash('warning', 'Already marked present: ' . trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? '')));
+            Session::flash('warning', 'Already marked: ' . trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? '')));
             $this->redirectQuick($serviceDate, $serviceType);
         }
+
+        $tz = $this->resolveAttendanceTimezone();
+        $now = new DateTimeImmutable('now', $tz);
+        $checkIn = new DateTimeImmutable($serviceDate . ' ' . $now->format('H:i:s'), $tz);
+        $deviceTime = $checkIn->format('Y-m-d H:i:s');
+        $status = $this->computeAttendanceStatus($serviceDate, $deviceTime);
 
         $attendanceModel->create([
             'member_id' => $memberId,
             'service_date' => $serviceDate,
             'service_type' => $serviceType,
-            'status' => 'Present',
+            'status' => $status,
             'source' => $mode,
             'bio_id' => trim((string)($member['bio_id'] ?? '')) !== '' ? strtoupper(trim((string)($member['bio_id'] ?? ''))) : null,
+            'device_time' => $deviceTime,
             'imported_at' => date('Y-m-d H:i:s')
         ]);
 
-        Session::flash('success', 'Marked present: ' . trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? '')));
+        Session::flash('success', 'Marked ' . strtolower($status) . ': ' . trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? '')));
         $this->redirectQuick($serviceDate, $serviceType);
+    }
+
+    public function download()
+    {
+        if (!Auth::isAdmin() && !Auth::isPastor() && !Auth::isVisitationTeam()) {
+            Session::flash('error', 'Unauthorized access.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+
+        $serviceDate = trim((string)($_GET['service_date'] ?? ''));
+        $serviceType = trim((string)($_GET['service_type'] ?? ''));
+        $statusFilter = strtolower(trim((string)($_GET['status'] ?? 'all')));
+        if (!in_array($statusFilter, ['all', 'present', 'late', 'absent'], true)) {
+            $statusFilter = 'all';
+        }
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            Session::flash('error', 'Invalid service date.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+        if ($serviceType === '') {
+            Session::flash('error', 'Service type is required.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/attendance");
+            exit;
+        }
+        $serviceType = mb_substr($serviceType, 0, 100);
+
+        $this->ensureAttendanceSchema();
+        $report = $this->buildServiceAttendanceReport($serviceDate, $serviceType);
+        $rows = $report['rows'] ?? [];
+
+        $filename = 'attendance_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', strtolower($serviceType)) . '_' . $serviceDate . '_' . $statusFilter . '_' . date('His') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $out = fopen('php://output', 'w');
+        if (!$out) {
+            exit;
+        }
+
+        fputcsv($out, [
+            'member code',
+            'bio id',
+            'name',
+            'gender',
+            'department name',
+            'group name',
+            'stays at',
+            'address',
+            'phone',
+            'attendance status',
+            'check-in time',
+            'source'
+        ]);
+
+        foreach ($rows as $row) {
+            $status = trim((string)($row['status'] ?? 'Absent'));
+            $statusKey = strtolower($status);
+            if ($statusFilter !== 'all' && $statusKey !== $statusFilter) {
+                continue;
+            }
+
+            $m = is_array($row['member'] ?? null) ? $row['member'] : [];
+            $memberCode = trim((string)($m['member_code'] ?? ''));
+            $bioId = trim((string)($m['bio_id'] ?? ''));
+            $name = trim((string)($m['first_name'] ?? '') . ' ' . (string)($m['last_name'] ?? ''));
+            $gender = trim((string)($m['gender'] ?? ''));
+            $departmentName = trim((string)($m['department_name'] ?? ''));
+            $groupName = trim((string)($m['group_name'] ?? ''));
+            $staysAt = trim((string)($m['stays_at'] ?? ''));
+            $address = trim((string)($m['address'] ?? ''));
+            $phone = trim((string)($m['phone'] ?? ''));
+
+            $checkIn = trim((string)($row['check_in'] ?? ''));
+            $checkInTime = '';
+            if ($checkIn !== '') {
+                $checkInTime = date('H:i:s', strtotime($checkIn));
+            }
+
+            fputcsv($out, [
+                $memberCode,
+                $bioId,
+                $name,
+                $gender,
+                $departmentName,
+                $groupName,
+                $staysAt,
+                $address,
+                $phone,
+                $status,
+                $checkInTime,
+                (string)($row['source'] ?? '')
+            ]);
+        }
+
+        fclose($out);
+        exit;
     }
 
     public function pushOnline()
@@ -595,6 +770,149 @@ class AttendanceController extends BaseController {
                 }
             }
         });
+    }
+
+    private function resolveAttendanceTimezone(): DateTimeZone
+    {
+        $tzName = $this->getBioTimeTimezone();
+        try {
+            return new DateTimeZone($tzName !== '' ? $tzName : 'Africa/Accra');
+        } catch (Throwable $e) {
+            return new DateTimeZone('Africa/Accra');
+        }
+    }
+
+    private function computeAttendanceStatus(string $serviceDate, ?string $checkInDateTime): string
+    {
+        $serviceDate = trim($serviceDate);
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            return 'Absent';
+        }
+        $checkInDateTime = $checkInDateTime !== null ? trim($checkInDateTime) : null;
+        if ($checkInDateTime === null || $checkInDateTime === '') {
+            return 'Absent';
+        }
+
+        $tz = $this->resolveAttendanceTimezone();
+        try {
+            $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $checkInDateTime, $tz);
+            if ($dt === false) {
+                $dt = new DateTimeImmutable($checkInDateTime, $tz);
+            }
+            $dt = $dt->setTimezone($tz);
+        } catch (Throwable $e) {
+            return 'Absent';
+        }
+
+        $presentEnd = new DateTimeImmutable($serviceDate . ' 10:30:59', $tz);
+        $lateStart = new DateTimeImmutable($serviceDate . ' 10:31:00', $tz);
+        $lateEnd = new DateTimeImmutable($serviceDate . ' 12:00:00', $tz);
+
+        if ($dt > $lateEnd) {
+            return 'Absent';
+        }
+        if ($dt >= $lateStart) {
+            return 'Late';
+        }
+        if ($dt <= $presentEnd) {
+            return 'Present';
+        }
+        return 'Present';
+    }
+
+    private function buildServiceAttendanceReport(string $serviceDate, string $serviceType): array
+    {
+        $db = Database::getInstance();
+        $members = $db->fetchAll(
+            "SELECT m.id,
+                    m.member_code,
+                    m.bio_id,
+                    m.first_name,
+                    m.last_name,
+                    m.gender,
+                    m.stays_at,
+                    m.address,
+                    m.phone,
+                    d.name AS department_name,
+                    c.name AS group_name
+             FROM members m
+             LEFT JOIN departments d ON m.department_id = d.id
+             LEFT JOIN clusters c ON m.cluster_id = c.id
+             ORDER BY m.last_name ASC, m.first_name ASC"
+        ) ?: [];
+        if (empty($members)) {
+            return [
+                'service_date' => $serviceDate,
+                'service_type' => $serviceType,
+                'counts' => ['present' => 0, 'late' => 0, 'absent' => 0, 'total' => 0],
+                'rows' => []
+            ];
+        }
+
+        $attendanceRows = $db->fetchAll(
+            "SELECT a.*
+             FROM attendance a
+             WHERE a.service_date = ?
+               AND a.service_type = ?",
+            [$serviceDate, $serviceType]
+        ) ?: [];
+
+        $attByMemberId = [];
+        foreach ($attendanceRows as $a) {
+            $mid = (int)($a['member_id'] ?? 0);
+            if ($mid > 0 && !isset($attByMemberId[$mid])) {
+                $attByMemberId[$mid] = $a;
+            }
+        }
+
+        $present = 0;
+        $late = 0;
+        $absent = 0;
+        $rows = [];
+
+        foreach ($members as $m) {
+            $mid = (int)($m['id'] ?? 0);
+            if ($mid <= 0) {
+                continue;
+            }
+
+            $a = $attByMemberId[$mid] ?? null;
+            $source = '';
+            $checkIn = '';
+            $status = 'Absent';
+
+            if (is_array($a)) {
+                $source = trim((string)($a['source'] ?? ''));
+                $checkIn = trim((string)($a['device_time'] ?? ''));
+                if ($checkIn === '') {
+                    $checkIn = trim((string)($a['imported_at'] ?? ''));
+                }
+                $status = $this->computeAttendanceStatus($serviceDate, $checkIn !== '' ? $checkIn : null);
+            }
+
+            if ($status === 'Present') $present++;
+            elseif ($status === 'Late') $late++;
+            else $absent++;
+
+            $rows[] = [
+                'status' => $status,
+                'check_in' => $checkIn,
+                'source' => $source,
+                'member' => $m
+            ];
+        }
+
+        return [
+            'service_date' => $serviceDate,
+            'service_type' => $serviceType,
+            'counts' => [
+                'present' => $present,
+                'late' => $late,
+                'absent' => $absent,
+                'total' => $present + $late + $absent
+            ],
+            'rows' => $rows
+        ];
     }
 
     private function getAttendanceMode(): string

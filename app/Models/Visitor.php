@@ -60,9 +60,8 @@ class Visitor extends BaseModel {
                        d.name AS assigned_department_name
                 FROM visitors v
                 INNER JOIN users u ON v.assigned_to = u.id
-                INNER JOIN departments d ON u.department_id = d.id
-                WHERE LOWER(COALESCE(u.role, '')) = 'visitation_team'
-                  AND LOWER(COALESCE(d.name, '')) LIKE '%visitation%'";
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE LOWER(COALESCE(u.role, '')) IN ('visitation_team', 'visitation team', 'visitation')";
         $params = [];
         if ($assignedTo !== null) {
             $sql .= " AND v.assigned_to = ?";

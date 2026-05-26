@@ -65,12 +65,17 @@ class FinancePaymentSmsService
             $message = self::buildMessage($transaction);
             $result = (new SmsService())->sendBulk([$phone], $message);
             if (($result['status'] ?? 'error') !== 'success') {
+                $debugRun = trim((string)($result['debug_run_id'] ?? ''));
+                if ($debugRun !== '') {
+                    $result['message'] = trim((string)($result['message'] ?? '')) . ' (Ref: ' . $debugRun . ')';
+                }
                 return [
                     'status' => 'error',
                     'message' => 'Transaction recorded, but SMS failed to send. ' . trim((string)($result['message'] ?? ''))
                 ];
             }
 
+            $debugRun = trim((string)($result['debug_run_id'] ?? ''));
             $provider = (string)AppConfig::getSetting('sms_provider', 'unknown');
             $db->query(
                 "INSERT INTO finance_payment_sms_logs (finance_id, member_id, phone, transaction_type, amount, provider, message, sent_at)
@@ -92,10 +97,15 @@ class FinancePaymentSmsService
                 'member_id' => $memberId,
                 'transaction_type' => $transactionTypeRaw,
                 'amount' => (float)($transaction['amount'] ?? 0),
-                'provider' => $provider
+                'provider' => $provider,
+                'debug_run_id' => $debugRun
             ]);
 
-            return ['status' => 'sent', 'message' => 'Transaction recorded successfully and SMS sent to the member.'];
+            $msg = 'Transaction recorded successfully and SMS sent to the member.';
+            if ($debugRun !== '') {
+                $msg .= ' (Ref: ' . $debugRun . ')';
+            }
+            return ['status' => 'sent', 'message' => $msg];
         } catch (Throwable $e) {
             error_log('FinancePaymentSmsService Failure: ' . $e->getMessage());
             return ['status' => 'error', 'message' => 'Transaction recorded, but SMS failed to send due to a system error.'];

@@ -1280,7 +1280,7 @@
                                 </div>
                             </div>
                         <?php endif; ?>
-                        <a href="<?php echo BASE_URL; ?>/logout" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all border border-white/10">
+                        <a href="<?php echo BASE_URL; ?>/logout" onclick="return confirm('Are you sure you want to logout?');" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all border border-white/10">
                             <i class="fas fa-right-from-bracket text-sm"></i>
                         </a>
                     </div>

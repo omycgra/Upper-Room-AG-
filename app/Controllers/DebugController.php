@@ -3,7 +3,11 @@ require_once __DIR__ . '/BaseController.php';
 
 class DebugController extends BaseController {
     public function smsLogs() {
-        $this->isAdmin();
+        if (!Auth::isAdmin() && !Auth::isFinanceHead()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/dashboard');
+            exit;
+        }
 
         $appEnv = strtolower((string)Env::get('APP_ENV', 'development'));
         $appDebug = Env::bool('APP_DEBUG', $appEnv !== 'production');
@@ -62,4 +66,3 @@ class DebugController extends BaseController {
         exit;
     }
 }
-

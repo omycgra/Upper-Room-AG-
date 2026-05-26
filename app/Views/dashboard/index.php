@@ -40,7 +40,7 @@
                         <h3 class="text-2xl sm:text-3xl font-black text-white tracking-tight mt-3">Department access not configured</h3>
                         <p class="text-sm font-bold text-slate-400 mt-4 max-w-2xl">Your account has no department assigned. Contact an admin to assign your department, then login again.</p>
                     </div>
-                    <a href="<?php echo BASE_URL; ?>/logout" class="inline-flex items-center justify-center bg-accent text-slate-900 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                    <a href="<?php echo BASE_URL; ?>/logout" onclick="return confirm('Are you sure you want to logout?');" class="inline-flex items-center justify-center bg-accent text-slate-900 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
                         Logout
                     </a>
                 </div>
@@ -292,7 +292,11 @@
                 </a>
             </div>
         </div>
-        <div class="p-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div class="p-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
+            <div class="bg-white/5 rounded-[2rem] p-6 border border-white/10">
+                <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Visitors</p>
+                <p class="text-3xl font-black text-white mt-3"><?php echo number_format((int)($visitationSummary['all_visitors_total'] ?? 0)); ?></p>
+            </div>
             <div class="bg-white/5 rounded-[2rem] p-6 border border-white/10">
                 <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Assigned Visitors</p>
                 <p class="text-3xl font-black text-white mt-3"><?php echo number_format((int)($visitationSummary['assigned_total'] ?? 0)); ?></p>
@@ -328,7 +332,7 @@
         </div>
         <div class="p-5 sm:p-6 lg:p-10">
             <?php if (empty($assignedVisitors)): ?>
-                <div class="text-center text-slate-500 font-bold italic py-10">No visitor has been assigned to a visitation member yet.</div>
+                <div class="text-center text-slate-500 font-bold italic py-10">No visitor has been assigned to you yet.</div>
             <?php else: ?>
                 <div class="hidden xl:block overflow-x-auto">
                     <table class="w-full min-w-[1200px] text-left">

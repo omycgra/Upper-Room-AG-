@@ -10,7 +10,7 @@ class VisitorController extends BaseController {
         $me = (int)Session::get('user_id');
         $assignees = [];
         if (Auth::isVisitationTeam()) {
-            $visitors = $visitorModel->getAssignedToUserWithAssignee($me);
+            $visitors = $visitorModel->getAllWithAssignee();
         } else {
             $visitors = $visitorModel->getAllWithAssignee();
             if (Auth::isAdmin() || Auth::isPastor()) {
@@ -211,7 +211,15 @@ class VisitorController extends BaseController {
         }
 
         try {
-            $db->query("UPDATE visitors SET approved_by = ?, approved_at = NOW() WHERE id = ? AND approved_at IS NULL", [$me, $visitorId]);
+            $db->query(
+                "UPDATE visitors
+                 SET approved_by = ?,
+                     approved_at = NOW(),
+                     follow_up_status = CASE WHEN COALESCE(follow_up_status, '') = 'Completed' THEN follow_up_status ELSE 'Approved' END
+                 WHERE id = ?
+                   AND approved_at IS NULL",
+                [$me, $visitorId]
+            );
             AuditLog::log("Approved assigned visitor record", "visitors", $visitorId);
             Session::flash('success', 'Visitor approved successfully.');
         } catch (Throwable $e) {
@@ -301,7 +309,10 @@ class VisitorController extends BaseController {
         try {
             $db->query(
                 "UPDATE visitors
-                 SET assigned_to = ?, approved_by = NULL, approved_at = NULL
+                 SET assigned_to = ?,
+                     approved_by = NULL,
+                     approved_at = NULL,
+                     follow_up_status = 'Pending'
                  WHERE id = ?",
                 [$assignedTo, $visitorId]
             );
@@ -333,7 +344,10 @@ class VisitorController extends BaseController {
              FROM users u
              LEFT JOIN departments d ON u.department_id = d.id
              WHERE LOWER(COALESCE(u.role, '')) IN ('visitation_team', 'visitation team', 'visitation')
-               AND LOWER(COALESCE(d.name, '')) LIKE '%visitation%'
+               AND (
+                    LOWER(COALESCE(d.name, '')) LIKE '%visitation%'
+                    OR COALESCE(d.name, '') = ''
+               )
              ORDER BY display_name ASC"
         );
     }
