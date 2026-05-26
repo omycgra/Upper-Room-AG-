@@ -416,7 +416,7 @@ class MemberController extends BaseController {
                     'first_name' => $this->uppercaseImportedValue($firstNameRaw ?? ''),
                     'last_name' => $this->uppercaseImportedValue($lastNameRaw ?? ''),
                     'gender' => $this->normalizeImportedOption($genderRaw ?? 'male', 'male'),
-                    'date_of_birth' => !empty($dobRaw) ? trim((string)$dobRaw) : null,
+                    'date_of_birth' => $this->normalizeImportedDate($dobRaw),
                     'nationality' => $this->uppercaseImportedValue($nationalityRaw),
                     'phone' => $this->uppercaseImportedValue($phoneRaw),
                     'address' => $this->uppercaseImportedValue($addressRaw),
@@ -462,10 +462,16 @@ class MemberController extends BaseController {
             AuditLog::log("Imported $count members via Excel", "members");
             $suffix = $skipped > 0 ? (" (Skipped existing: $skipped)") : '';
             Session::flash('success', "Successfully imported $count members" . $suffix);
+        } elseif ($skipped > 0 && empty($errors)) {
+            Session::flash('success', "No new members imported (Skipped existing: $skipped).");
+        } elseif ($skipped === 0 && empty($errors)) {
+            Session::flash('error', 'No valid rows found. Make sure FIRST NAME and LAST NAME are filled and the file matches the template.');
         }
         
         if (!empty($errors)) {
-            Session::flash('error', implode("<br>", array_slice($errors, 0, 3)) . (count($errors) > 3 ? "... and more" : ""));
+            $first = (string)($errors[0] ?? 'Import failed.');
+            $more = count($errors) - 1;
+            Session::flash('error', $more > 0 ? ($first . " (+{$more} more)") : $first);
         }
 
         $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
@@ -580,7 +586,7 @@ class MemberController extends BaseController {
 
     private function ensureMemberSchema() {
         $db = Database::getInstance();
-        SchemaState::once('members_schema_v2', function () use ($db) {
+        SchemaState::once('members_schema_v3', function () use ($db) {
             if (!$db->columnExists('members', 'occupation')) {
                 $db->query("ALTER TABLE members ADD COLUMN occupation VARCHAR(100) NULL");
             }
@@ -909,6 +915,28 @@ class MemberController extends BaseController {
         return $trimmed === '' ? $default : strtolower($trimmed);
     }
 
+    private function normalizeImportedDate($value): ?string
+    {
+        $v = trim((string)$value);
+        if ($v === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d+(\.\d+)?$/', $v)) {
+            $days = (int)floor((float)$v);
+            if ($days > 20000 && $days < 60000) {
+                $unix = ($days - 25569) * 86400;
+                return gmdate('Y-m-d', $unix);
+            }
+        }
+
+        $ts = strtotime($v);
+        if ($ts === false) {
+            return null;
+        }
+        return date('Y-m-d', $ts);
+    }
+
     private function parseDepartmentIds($values) {
         if (!is_array($values)) {
             $values = [$values];
@@ -924,12 +952,29 @@ class MemberController extends BaseController {
         }
 
         $db = Database::getInstance();
-        $row = $db->fetch("SELECT id FROM clusters WHERE UPPER(name) = UPPER(?) LIMIT 1", [$trimmed]);
-        if (!$row) {
-            throw new Exception('Group not found: ' . $trimmed);
+        $candidates = [$trimmed];
+        if (preg_match('/\(([^)]+)\)/', $trimmed, $m)) {
+            $inside = trim((string)($m[1] ?? ''));
+            if ($inside !== '') {
+                $candidates[] = $inside;
+            }
+        }
+        if (strpos($trimmed, '-') !== false) {
+            $parts = array_values(array_filter(array_map('trim', explode('-', $trimmed))));
+            if (!empty($parts)) {
+                $candidates[] = end($parts);
+            }
+        }
+        $candidates = array_values(array_unique(array_filter($candidates, fn($v) => trim((string)$v) !== '')));
+
+        foreach ($candidates as $candidate) {
+            $row = $db->fetch("SELECT id FROM clusters WHERE UPPER(name) = UPPER(?) LIMIT 1", [$candidate]);
+            if ($row) {
+                return (int)$row['id'];
+            }
         }
 
-        return (int)$row['id'];
+        return null;
     }
 
     private function resolveDepartmentAssignmentsByName($value) {
@@ -955,7 +1000,7 @@ class MemberController extends BaseController {
         foreach ($names as $name) {
             $row = $db->fetch("SELECT id FROM departments WHERE UPPER(name) = UPPER(?) LIMIT 1", [$name]);
             if (!$row) {
-                throw new Exception('Department not found: ' . $name);
+                continue;
             }
             $departmentIds[] = (int)$row['id'];
         }
