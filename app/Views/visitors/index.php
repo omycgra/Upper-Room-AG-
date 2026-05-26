@@ -116,8 +116,9 @@
                                             data-visitor-id="<?php echo (int)$visitor['id']; ?>"
                                             data-visitor-name="<?php echo htmlspecialchars(trim(($visitor['first_name'] ?? '') . ' ' . ($visitor['last_name'] ?? ''))); ?>"
                                             data-assigned-to="<?php echo (int)($visitor['assigned_to'] ?? 0); ?>"
+                                            data-is-approved="<?php echo $isApproved ? '1' : '0'; ?>"
                                             class="inline-flex h-10 items-center justify-center rounded-xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest px-4">
-                                            Assign
+                                            <?php echo $isApproved ? 'Reassign' : 'Assign'; ?>
                                         </button>
                                     <?php endif; ?>
                                 </div>
@@ -214,8 +215,9 @@
                                                     data-visitor-id="<?php echo (int)$visitor['id']; ?>"
                                                     data-visitor-name="<?php echo htmlspecialchars(trim(($visitor['first_name'] ?? '') . ' ' . ($visitor['last_name'] ?? ''))); ?>"
                                                     data-assigned-to="<?php echo (int)($visitor['assigned_to'] ?? 0); ?>"
+                                                    data-is-approved="<?php echo $isApproved ? '1' : '0'; ?>"
                                                     class="h-9 px-4 rounded-xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest">
-                                                    Assign
+                                                    <?php echo $isApproved ? 'Reassign' : 'Assign'; ?>
                                                 </button>
                                             <?php endif; ?>
                                         </div>
@@ -238,7 +240,7 @@
     <div class="glass-card w-full max-w-md rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center mb-10">
             <div>
-                <h3 class="text-3xl font-black text-white tracking-tighter">Assign Visitor</h3>
+                <h3 id="assign-visitor-title" class="text-3xl font-black text-white tracking-tighter">Assign Visitor</h3>
                 <p id="assign-visitor-target" class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2"></p>
             </div>
             <button type="button" onclick="document.getElementById('assign-visitor-modal').classList.add('hidden')" class="w-10 h-10 bg-white/5 hover:bg-accent hover:text-slate-900 text-slate-400 rounded-xl flex items-center justify-center transition-all border border-white/10">
@@ -276,20 +278,23 @@
         const idInput = document.getElementById('assign-visitor-id');
         const select = document.getElementById('assign-visitor-select');
         const label = document.getElementById('assign-visitor-target');
+        const title = document.getElementById('assign-visitor-title');
         if (!modal || !idInput || !select || !label) return;
 
-        const open = (visitorId, visitorName, assignedTo) => {
+        const open = (visitorId, visitorName, assignedTo, isApproved) => {
             idInput.value = String(visitorId || '');
             label.textContent = String(visitorName || '').trim();
             const v = String(assignedTo || '');
             if (v !== '') select.value = v;
+            const approved = String(isApproved || '') === '1';
+            if (title) title.textContent = approved ? 'Reassign Visitor' : 'Assign Visitor';
             modal.classList.remove('hidden');
         };
 
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-assign-visitor="1"]');
             if (!btn) return;
-            open(btn.dataset.visitorId, btn.dataset.visitorName, btn.dataset.assignedTo);
+            open(btn.dataset.visitorId, btn.dataset.visitorName, btn.dataset.assignedTo, btn.dataset.isApproved);
         });
 
         modal.addEventListener('click', (e) => {

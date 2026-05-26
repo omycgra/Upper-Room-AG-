@@ -244,6 +244,7 @@ class MemberController extends BaseController {
                     $data['photo_path'] = $photoPath;
                     // Delete old photo if exists
                     if (!empty($oldMember['photo_path'])) {
+                        $this->supabaseDeleteByPublicUrl((string)$oldMember['photo_path']);
                         $oldFile = $this->resolveUploadFilePath($oldMember['photo_path']);
                         if ($oldFile !== '' && file_exists($oldFile)) {
                             @unlink($oldFile);
@@ -758,6 +759,18 @@ class MemberController extends BaseController {
             throw new Exception("Only JPG, JPEG, PNG, GIF & WEBP files are allowed.");
         }
 
+        $supabaseUrl = trim((string)Env::get('SUPABASE_URL', ''));
+        $supabaseServiceRoleKey = trim((string)Env::get('SUPABASE_SERVICE_ROLE_KEY', ''));
+        $bucket = trim((string)Env::get('SUPABASE_STORAGE_BUCKET', ''));
+        if ($bucket === '') $bucket = 'uploads';
+
+        if ($supabaseUrl !== '' && $supabaseServiceRoleKey !== '') {
+            $mime = $this->resolveMimeType($file["tmp_name"], $fileExtension);
+            $objectPath = 'members/' . date('Y') . '/' . date('m') . '/' . $newFileName;
+            $publicUrl = $this->supabaseUploadObject($supabaseUrl, $supabaseServiceRoleKey, $bucket, $objectPath, $file["tmp_name"], $mime);
+            return $publicUrl;
+        }
+
         if (!is_uploaded_file($file["tmp_name"])) {
             throw new Exception("Upload failed.");
         }
@@ -786,10 +799,140 @@ class MemberController extends BaseController {
     private function resolveUploadFilePath($storedPath) {
         $p = $this->normalizeUploadPath($storedPath);
         if ($p === '') return '';
+        if (preg_match('#^https?://#i', $p)) return '';
         $full = ROOT_PATH . '/' . $p;
         if (file_exists($full)) return $full;
         $alt = ROOT_PATH . '/public/' . ltrim($p, '/');
         if (file_exists($alt)) return $alt;
         return $full;
+    }
+
+    private function resolveMimeType($tmpFile, $extension) {
+        $mime = '';
+        if (function_exists('finfo_open')) {
+            try {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo) {
+                    $detected = finfo_file($finfo, $tmpFile);
+                    finfo_close($finfo);
+                    if (is_string($detected)) $mime = $detected;
+                }
+            } catch (Throwable $e) {
+            }
+        }
+        if ($mime !== '') return $mime;
+        $map = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+        ];
+        return $map[strtolower((string)$extension)] ?? 'application/octet-stream';
+    }
+
+    private function supabaseUploadObject($supabaseUrl, $serviceRoleKey, $bucket, $objectPath, $tmpFile, $contentType) {
+        $base = rtrim((string)$supabaseUrl, '/');
+        $bucket = trim((string)$bucket);
+        $objectPath = ltrim((string)$objectPath, '/');
+        $encodedPath = implode('/', array_map('rawurlencode', array_filter(explode('/', $objectPath), 'strlen')));
+        $url = $base . '/storage/v1/object/' . rawurlencode($bucket) . '/' . $encodedPath;
+        $data = file_get_contents($tmpFile);
+        if ($data === false) {
+            throw new Exception('Failed to read upload file.');
+        }
+
+        $headers = [
+            'Authorization: Bearer ' . $serviceRoleKey,
+            'apikey: ' . $serviceRoleKey,
+            'x-upsert: true',
+            'Content-Type: ' . $contentType,
+        ];
+
+        $ok = false;
+        $status = 0;
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            $resp = curl_exec($ch);
+            if ($resp !== false) {
+                $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $ok = $status >= 200 && $status < 300;
+            }
+            curl_close($ch);
+        } else {
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'POST',
+                    'header' => implode("\r\n", $headers),
+                    'content' => $data,
+                    'ignore_errors' => true,
+                ]
+            ]);
+            $resp = @file_get_contents($url, false, $context);
+            $status = 0;
+            if (isset($http_response_header) && is_array($http_response_header)) {
+                foreach ($http_response_header as $h) {
+                    if (preg_match('#^HTTP/\\S+\\s+(\\d{3})#', $h, $m)) {
+                        $status = (int)$m[1];
+                        break;
+                    }
+                }
+            }
+            $ok = $status >= 200 && $status < 300;
+        }
+
+        if (!$ok) {
+            throw new Exception('Cloud upload failed.');
+        }
+
+        return $base . '/storage/v1/object/public/' . rawurlencode($bucket) . '/' . $encodedPath;
+    }
+
+    private function supabaseDeleteByPublicUrl($publicUrl) {
+        $publicUrl = trim((string)$publicUrl);
+        if ($publicUrl === '') return;
+
+        $supabaseUrl = trim((string)Env::get('SUPABASE_URL', ''));
+        $supabaseServiceRoleKey = trim((string)Env::get('SUPABASE_SERVICE_ROLE_KEY', ''));
+        $bucket = trim((string)Env::get('SUPABASE_STORAGE_BUCKET', ''));
+        if ($bucket === '') $bucket = 'uploads';
+        if ($supabaseUrl === '' || $supabaseServiceRoleKey === '') return;
+
+        $base = rtrim($supabaseUrl, '/');
+        $prefix = $base . '/storage/v1/object/public/' . $bucket . '/';
+        if (strpos($publicUrl, $prefix) !== 0) return;
+        $objectPath = substr($publicUrl, strlen($prefix));
+        if ($objectPath === '') return;
+        $objectPath = implode('/', array_map('rawurlencode', array_filter(explode('/', rawurldecode($objectPath)), 'strlen')));
+        $url = $base . '/storage/v1/object/' . rawurlencode($bucket) . '/' . $objectPath;
+
+        $headers = [
+            'Authorization: Bearer ' . $supabaseServiceRoleKey,
+            'apikey: ' . $supabaseServiceRoleKey,
+        ];
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_exec($ch);
+            curl_close($ch);
+            return;
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'DELETE',
+                'header' => implode("\r\n", $headers),
+                'ignore_errors' => true,
+            ]
+        ]);
+        @file_get_contents($url, false, $context);
     }
 }
