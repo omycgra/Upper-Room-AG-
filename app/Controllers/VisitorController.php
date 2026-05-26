@@ -7,17 +7,32 @@ class VisitorController extends BaseController {
         $this->denyIfDepartmentHead();
         $this->ensureVisitorSchema();
         $visitorModel = new Visitor();
-        $visitors = $visitorModel->getAllWithAssignee();
+        $me = (int)Session::get('user_id');
+        $assignees = [];
+        if (Auth::isVisitationTeam()) {
+            $visitors = $visitorModel->getAssignedToUserWithAssignee($me);
+        } else {
+            $visitors = $visitorModel->getAllWithAssignee();
+            if (Auth::isAdmin() || Auth::isPastor()) {
+                $assignees = $this->getFollowupUsers();
+            }
+        }
         
         View::render('visitors.index', [
             'title' => 'Visitor Tracking',
             'visitors' => $visitors,
-            'stats' => $this->buildVisitorStats($visitors)
+            'stats' => $this->buildVisitorStats($visitors),
+            'assignees' => $assignees
         ]);
     }
 
     public function add() {
         $this->denyIfDepartmentHead();
+        if (Auth::isPastor()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
         $this->ensureVisitorSchema();
         View::render('visitors.add', [
             'title' => 'Register New Visitor',
@@ -27,6 +42,11 @@ class VisitorController extends BaseController {
 
     public function store() {
         $this->denyIfDepartmentHead();
+        if (Auth::isPastor()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
         $this->ensureVisitorSchema();
         $visitorModel = new Visitor();
         $followupUsers = $this->getFollowupUsers();
@@ -100,7 +120,11 @@ class VisitorController extends BaseController {
         }
 
         $visitorModel = new Visitor();
-        $visitors = $visitorModel->getVisitationAssignments();
+        $assignedTo = null;
+        if (Auth::isVisitationTeam() && !Auth::isAdmin()) {
+            $assignedTo = (int)Session::get('user_id');
+        }
+        $visitors = $visitorModel->getVisitationAssignments(null, $assignedTo);
         $filename = 'visitation_assigned_visitors_' . date('Y-m-d') . '.csv';
 
         header('Content-Type: text/csv; charset=utf-8');
@@ -153,6 +177,144 @@ class VisitorController extends BaseController {
         exit;
     }
 
+    public function approve() {
+        $this->ensureVisitorSchema();
+        if (!Auth::isAdmin() && !Auth::isVisitationTeam()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/dashboard');
+            exit;
+        }
+
+        $visitorId = (int)($_POST['visitor_id'] ?? 0);
+        if ($visitorId <= 0) {
+            Session::flash('error', 'Invalid visitor.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        $db = Database::getInstance();
+        $visitorModel = new Visitor();
+        $visitor = $visitorModel->findWithAssignee($visitorId);
+        if (!$visitor) {
+            Session::flash('error', 'Visitor not found.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        $me = (int)Session::get('user_id');
+        if (Auth::isVisitationTeam() && !Auth::isAdmin()) {
+            if ((int)($visitor['assigned_to'] ?? 0) !== $me) {
+                Session::flash('error', 'You are not assigned to this visitor.');
+                header('Location: ' . BASE_URL . '/visitors');
+                exit;
+            }
+        }
+
+        try {
+            $db->query("UPDATE visitors SET approved_by = ?, approved_at = NOW() WHERE id = ? AND approved_at IS NULL", [$me, $visitorId]);
+            AuditLog::log("Approved assigned visitor record", "visitors", $visitorId);
+            Session::flash('success', 'Visitor approved successfully.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to approve visitor: ' . $e->getMessage());
+        }
+
+        header('Location: ' . BASE_URL . '/visitors');
+        exit;
+    }
+
+    public function details() {
+        $this->denyIfDepartmentHead();
+        $this->ensureVisitorSchema();
+
+        $visitorId = (int)($_GET['id'] ?? 0);
+        if ($visitorId <= 0) {
+            Session::flash('error', 'Invalid visitor.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        $visitorModel = new Visitor();
+        $visitor = $visitorModel->findWithAssignee($visitorId);
+        if (!$visitor) {
+            Session::flash('error', 'Visitor not found.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        $me = (int)Session::get('user_id');
+        $isAdmin = Auth::isAdmin();
+        $isVisitationTeam = Auth::isVisitationTeam();
+        $isApproved = !empty($visitor['approved_at']);
+
+        if ($isVisitationTeam && !$isAdmin) {
+            if ((int)($visitor['assigned_to'] ?? 0) !== $me) {
+                Session::flash('error', 'You are not assigned to this visitor.');
+                header('Location: ' . BASE_URL . '/visitors');
+                exit;
+            }
+            if (!$isApproved) {
+                Session::flash('error', 'Approve this visitor before viewing full details.');
+                header('Location: ' . BASE_URL . '/visitors');
+                exit;
+            }
+        }
+
+        View::render('visitors.details', [
+            'title' => 'Visitor Details',
+            'visitor' => $visitor
+        ]);
+    }
+
+    public function assign() {
+        $this->ensureVisitorSchema();
+        if (!Auth::isAdmin() && !Auth::isPastor()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/dashboard');
+            exit;
+        }
+
+        $visitorId = (int)($_POST['visitor_id'] ?? 0);
+        $assignedTo = (int)($_POST['assigned_to'] ?? 0);
+        if ($visitorId <= 0 || $assignedTo <= 0) {
+            Session::flash('error', 'Invalid assignment details.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        $assignees = $this->getFollowupUsers();
+        $allowedAssigneeIds = array_map('intval', array_column($assignees, 'id'));
+        if (!in_array($assignedTo, $allowedAssigneeIds, true)) {
+            Session::flash('error', 'Visitor assignment must be to a visitation team member only.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        $db = Database::getInstance();
+        $visitorModel = new Visitor();
+        $visitor = $visitorModel->findWithAssignee($visitorId);
+        if (!$visitor) {
+            Session::flash('error', 'Visitor not found.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        try {
+            $db->query(
+                "UPDATE visitors
+                 SET assigned_to = ?, approved_by = NULL, approved_at = NULL
+                 WHERE id = ?",
+                [$assignedTo, $visitorId]
+            );
+            AuditLog::log("Assigned visitor to visitation team member", "visitors", $visitorId);
+            Session::flash('success', 'Visitor assigned successfully.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to assign visitor: ' . $e->getMessage());
+        }
+
+        header('Location: ' . BASE_URL . '/visitors');
+        exit;
+    }
+
     private function denyIfDepartmentHead() {
         if (Session::get('user_role') === 'dept_head') {
             Session::flash('error', 'Unauthorized access.');
@@ -170,7 +332,7 @@ class VisitorController extends BaseController {
                     d.name AS department_name
              FROM users u
              LEFT JOIN departments d ON u.department_id = d.id
-             WHERE LOWER(COALESCE(u.role, '')) = 'visitation_team'
+             WHERE LOWER(COALESCE(u.role, '')) IN ('visitation_team', 'visitation team', 'visitation')
                AND LOWER(COALESCE(d.name, '')) LIKE '%visitation%'
              ORDER BY display_name ASC"
         );
@@ -215,6 +377,8 @@ class VisitorController extends BaseController {
                 'preferred_contact_method' => "ALTER TABLE visitors ADD COLUMN preferred_contact_method VARCHAR(30) NULL",
                 'follow_up_date' => "ALTER TABLE visitors ADD COLUMN follow_up_date DATE NULL",
                 'follow_up_notes' => "ALTER TABLE visitors ADD COLUMN follow_up_notes TEXT NULL",
+                'approved_by' => "ALTER TABLE visitors ADD COLUMN approved_by INT NULL",
+                'approved_at' => "ALTER TABLE visitors ADD COLUMN approved_at " . ($db->isPgsql() ? "TIMESTAMPTZ NULL" : "DATETIME NULL")
             ];
 
             foreach ($columns as $columnName => $sql) {

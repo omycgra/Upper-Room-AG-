@@ -93,6 +93,7 @@ class MemberController extends BaseController {
             $photoPath = null;
             if (!empty($_FILES['photo']['name'])) {
                 $photoPath = $this->handleUpload($_FILES['photo']);
+                $photoPath = $this->normalizeUploadPath($photoPath);
             }
 
             $data = [
@@ -239,10 +240,14 @@ class MemberController extends BaseController {
             if (!empty($_FILES['photo']['name'])) {
                 $photoPath = $this->handleUpload($_FILES['photo']);
                 if ($photoPath) {
+                    $photoPath = $this->normalizeUploadPath($photoPath);
                     $data['photo_path'] = $photoPath;
                     // Delete old photo if exists
-                    if ($oldMember['photo_path'] && file_exists(ROOT_PATH . '/' . $oldMember['photo_path'])) {
-                        unlink(ROOT_PATH . '/' . $oldMember['photo_path']);
+                    if (!empty($oldMember['photo_path'])) {
+                        $oldFile = $this->resolveUploadFilePath($oldMember['photo_path']);
+                        if ($oldFile !== '' && file_exists($oldFile)) {
+                            @unlink($oldFile);
+                        }
                     }
                 }
             }
@@ -557,6 +562,7 @@ class MemberController extends BaseController {
                 'baptism_pastor_church' => "ALTER TABLE members ADD COLUMN baptism_pastor_church VARCHAR(255) NULL",
                 'currently_working' => "ALTER TABLE members ADD COLUMN currently_working BOOLEAN NOT NULL DEFAULT FALSE",
                 'work_name' => "ALTER TABLE members ADD COLUMN work_name VARCHAR(150) NULL",
+                'photo_path' => "ALTER TABLE members ADD COLUMN photo_path VARCHAR(255) NULL",
             ];
 
             foreach ($columns as $columnName => $sql) {
@@ -710,6 +716,23 @@ class MemberController extends BaseController {
 
 
     private function handleUpload($file) {
+        if (!is_array($file) || !isset($file['error'])) {
+            throw new Exception("Upload failed.");
+        }
+        $err = (int)$file['error'];
+        if ($err !== UPLOAD_ERR_OK) {
+            $map = [
+                UPLOAD_ERR_INI_SIZE => 'File is too large.',
+                UPLOAD_ERR_FORM_SIZE => 'File is too large.',
+                UPLOAD_ERR_PARTIAL => 'File upload was interrupted.',
+                UPLOAD_ERR_NO_FILE => 'No file selected.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Server temporary folder missing.',
+                UPLOAD_ERR_CANT_WRITE => 'Server failed to write file.',
+                UPLOAD_ERR_EXTENSION => 'Upload blocked by server extension.',
+            ];
+            throw new Exception($map[$err] ?? 'Upload failed.');
+        }
+
         $targetDir = "public/uploads/members/";
         if (!is_dir(ROOT_PATH . '/' . $targetDir)) {
             mkdir(ROOT_PATH . '/' . $targetDir, 0777, true);
@@ -731,14 +754,42 @@ class MemberController extends BaseController {
         }
 
         // Allow certain file formats
-        if($fileExtension != "jpg" && $fileExtension != "png" && $fileExtension != "jpeg" && $fileExtension != "gif" ) {
-            throw new Exception("Only JPG, JPEG, PNG & GIF files are allowed.");
+        if (!in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            throw new Exception("Only JPG, JPEG, PNG, GIF & WEBP files are allowed.");
         }
 
-        if (move_uploaded_file($file["tmp_name"], ROOT_PATH . '/' . $targetFile)) {
-            return $targetFile;
-        } else {
-            throw new Exception("Failed to move uploaded file.");
+        if (!is_uploaded_file($file["tmp_name"])) {
+            throw new Exception("Upload failed.");
         }
+
+        if (!move_uploaded_file($file["tmp_name"], ROOT_PATH . '/' . $targetFile)) {
+            throw new Exception("Failed to save uploaded file.");
+        }
+
+        return $targetFile;
+    }
+
+    private function normalizeUploadPath($path) {
+        $p = str_replace('\\', '/', (string)$path);
+        $p = ltrim(trim($p), '/');
+        $posPublic = strpos($p, 'public/uploads/');
+        if ($posPublic !== false) {
+            return substr($p, $posPublic);
+        }
+        $posUploads = strpos($p, 'uploads/');
+        if ($posUploads !== false) {
+            return 'public/' . substr($p, $posUploads);
+        }
+        return $p;
+    }
+
+    private function resolveUploadFilePath($storedPath) {
+        $p = $this->normalizeUploadPath($storedPath);
+        if ($p === '') return '';
+        $full = ROOT_PATH . '/' . $p;
+        if (file_exists($full)) return $full;
+        $alt = ROOT_PATH . '/public/' . ltrim($p, '/');
+        if (file_exists($alt)) return $alt;
+        return $full;
     }
 }

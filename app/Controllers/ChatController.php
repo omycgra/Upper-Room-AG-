@@ -105,42 +105,82 @@ class ChatController extends BaseController {
         $isFinanceHead = Auth::isFinanceHead();
         $isDeptHead = Auth::isDepartmentHead();
         $meRole = $this->normalizeRole((string)Session::get('user_role'));
+        $onlineCutoffSeconds = 10 * 60;
+        $nowTs = time();
 
         if ($isAdmin || $isPastor) {
             $roleFilterSql = '';
             if ($isPastor) {
                 $roleFilterSql = " AND LOWER(COALESCE(u.role,'')) NOT IN ('auditor','audit')";
             }
+            $notDeletedForAll = $db->isPgsql()
+                ? "COALESCE(deleted_for_all, FALSE) = FALSE"
+                : "COALESCE(deleted_for_all, 0) = 0";
+            $notDeletedBySender = $db->isPgsql()
+                ? "COALESCE(deleted_by_sender, FALSE) = FALSE"
+                : "COALESCE(deleted_by_sender, 0) = 0";
+            $notDeletedByRecipient = $db->isPgsql()
+                ? "COALESCE(deleted_by_recipient, FALSE) = FALSE"
+                : "COALESCE(deleted_by_recipient, 0) = 0";
+            $lmDeletedExpr = $db->isPgsql()
+                ? "COALESCE(lm.deleted_for_all, FALSE) = TRUE"
+                : "COALESCE(lm.deleted_for_all, 0) = 1";
+
             $rows = $db->fetchAll(
                 "SELECT
                     u.id as user_id,
                     u.name,
                     u.photo_path,
+                    u.last_activity_at,
                     t.id as thread_id,
-                    t.last_message_at
+                    t.last_message_at,
+                    COALESCE(unread.unread_count, 0) AS unread_count,
+                    COALESCE(last.last_message_id, 0) AS last_message_id,
+                    COALESCE(lm.sender_id, 0) AS last_sender_id,
+                    COALESCE(CASE WHEN $lmDeletedExpr THEN 'Message deleted' ELSE lm.message END, '') AS last_message
                  FROM users u
                  LEFT JOIN chat_threads t
                     ON (t.user_a = ? AND t.user_b = u.id) OR (t.user_a = u.id AND t.user_b = ?)
+                 LEFT JOIN (
+                    SELECT thread_id, COUNT(*) AS unread_count
+                    FROM chat_messages
+                    WHERE sender_id <> ?
+                      AND read_at IS NULL
+                      AND $notDeletedForAll
+                      AND $notDeletedByRecipient
+                    GROUP BY thread_id
+                 ) unread ON unread.thread_id = t.id
+                 LEFT JOIN (
+                    SELECT thread_id, MAX(id) AS last_message_id
+                    FROM chat_messages
+                    WHERE ((sender_id = ? AND $notDeletedBySender) OR (sender_id <> ? AND $notDeletedByRecipient))
+                    GROUP BY thread_id
+                 ) last ON last.thread_id = t.id
+                 LEFT JOIN chat_messages lm ON lm.id = last.last_message_id
                  WHERE u.id <> ?
                    $roleFilterSql
                  ORDER BY COALESCE(t.last_message_at, t.created_at) DESC, u.name ASC",
-                [$me, $me, $me]
+                [$me, $me, $me, $me, $me, $me]
             ) ?: [];
 
             $threads = [];
             foreach ($rows as $r) {
                 $threadId = (int)($r['thread_id'] ?? 0);
-                $meta = $threadId > 0 ? $this->getThreadMeta($db, $threadId, $me) : $this->emptyThreadMeta();
+                $lastActivityAt = (string)($r['last_activity_at'] ?? '');
+                $ts = $lastActivityAt !== '' ? strtotime($lastActivityAt) : false;
+                $isOnline = $ts !== false && ($nowTs - (int)$ts) <= $onlineCutoffSeconds;
                 $threads[] = [
                     'thread_id' => $threadId,
                     'user_id' => (int)($r['user_id'] ?? 0),
                     'name' => (string)($r['name'] ?? ''),
                     'photo_path' => (string)($r['photo_path'] ?? ''),
+                    'last_activity_at' => $lastActivityAt,
+                    'is_online' => $isOnline,
                     'last_message_at' => (string)($r['last_message_at'] ?? ''),
-                    'unread_count' => (int)($meta['unread_count'] ?? 0),
-                    'last_message_id' => (int)($meta['last_message_id'] ?? 0),
-                    'last_sender_id' => (int)($meta['last_sender_id'] ?? 0),
-                    'last_message' => (string)($meta['last_message'] ?? '')
+                    'unread_count' => (int)($r['unread_count'] ?? 0),
+                    'last_message_id' => (int)($r['last_message_id'] ?? 0),
+                    'last_sender_id' => (int)($r['last_sender_id'] ?? 0),
+                    'last_message' => (string)($r['last_message'] ?? '')
                 ];
             }
 
@@ -148,16 +188,50 @@ class ChatController extends BaseController {
         }
 
         if ($isFinanceHead) {
+            $notDeletedForAll = $db->isPgsql()
+                ? "COALESCE(deleted_for_all, FALSE) = FALSE"
+                : "COALESCE(deleted_for_all, 0) = 0";
+            $notDeletedBySender = $db->isPgsql()
+                ? "COALESCE(deleted_by_sender, FALSE) = FALSE"
+                : "COALESCE(deleted_by_sender, 0) = 0";
+            $notDeletedByRecipient = $db->isPgsql()
+                ? "COALESCE(deleted_by_recipient, FALSE) = FALSE"
+                : "COALESCE(deleted_by_recipient, 0) = 0";
+            $lmDeletedExpr = $db->isPgsql()
+                ? "COALESCE(lm.deleted_for_all, FALSE) = TRUE"
+                : "COALESCE(lm.deleted_for_all, 0) = 1";
+
             $rows = $db->fetchAll(
                 "SELECT
                     u.id as user_id,
                     u.name,
                     u.photo_path,
+                    u.last_activity_at,
                     t.id as thread_id,
-                    t.last_message_at
+                    t.last_message_at,
+                    COALESCE(unread.unread_count, 0) AS unread_count,
+                    COALESCE(last.last_message_id, 0) AS last_message_id,
+                    COALESCE(lm.sender_id, 0) AS last_sender_id,
+                    COALESCE(CASE WHEN $lmDeletedExpr THEN 'Message deleted' ELSE lm.message END, '') AS last_message
                  FROM users u
                  LEFT JOIN chat_threads t
                     ON (t.user_a = ? AND t.user_b = u.id) OR (t.user_a = u.id AND t.user_b = ?)
+                 LEFT JOIN (
+                    SELECT thread_id, COUNT(*) AS unread_count
+                    FROM chat_messages
+                    WHERE sender_id <> ?
+                      AND read_at IS NULL
+                      AND $notDeletedForAll
+                      AND $notDeletedByRecipient
+                    GROUP BY thread_id
+                 ) unread ON unread.thread_id = t.id
+                 LEFT JOIN (
+                    SELECT thread_id, MAX(id) AS last_message_id
+                    FROM chat_messages
+                    WHERE ((sender_id = ? AND $notDeletedBySender) OR (sender_id <> ? AND $notDeletedByRecipient))
+                    GROUP BY thread_id
+                 ) last ON last.thread_id = t.id
+                 LEFT JOIN chat_messages lm ON lm.id = last.last_message_id
                  WHERE u.id <> ?
                    AND LOWER(COALESCE(u.role, '')) IN (
                         'finance_staff','finance staff','finance',
@@ -166,38 +240,42 @@ class ChatController extends BaseController {
                         'pastor','reverend','rev','minister'
                    )
                  ORDER BY COALESCE(t.last_message_at, t.created_at) DESC, u.name ASC",
-                [$me, $me, $me]
+                [$me, $me, $me, $me, $me, $me]
             ) ?: [];
 
             $threads = [];
             foreach ($rows as $r) {
                 $threadId = (int)($r['thread_id'] ?? 0);
-                $meta = $threadId > 0 ? $this->getThreadMeta($db, $threadId, $me) : $this->emptyThreadMeta();
+                $lastActivityAt = (string)($r['last_activity_at'] ?? '');
+                $ts = $lastActivityAt !== '' ? strtotime($lastActivityAt) : false;
+                $isOnline = $ts !== false && ($nowTs - (int)$ts) <= $onlineCutoffSeconds;
                 $threads[] = [
                     'thread_id' => $threadId,
                     'user_id' => (int)($r['user_id'] ?? 0),
                     'name' => (string)($r['name'] ?? ''),
                     'photo_path' => (string)($r['photo_path'] ?? ''),
+                    'last_activity_at' => $lastActivityAt,
+                    'is_online' => $isOnline,
                     'last_message_at' => (string)($r['last_message_at'] ?? ''),
-                    'unread_count' => (int)($meta['unread_count'] ?? 0),
-                    'last_message_id' => (int)($meta['last_message_id'] ?? 0),
-                    'last_sender_id' => (int)($meta['last_sender_id'] ?? 0),
-                    'last_message' => (string)($meta['last_message'] ?? '')
+                    'unread_count' => (int)($r['unread_count'] ?? 0),
+                    'last_message_id' => (int)($r['last_message_id'] ?? 0),
+                    'last_sender_id' => (int)($r['last_sender_id'] ?? 0),
+                    'last_message' => (string)($r['last_message'] ?? '')
                 ];
             }
 
             $this->jsonResponse(['success' => true, 'threads' => $threads]);
         }
 
-        $adminRow = $db->fetch("SELECT id, name, photo_path FROM users WHERE LOWER(role) IN ('admin', 'administrator') ORDER BY id ASC LIMIT 1");
+        $adminRow = $db->fetch("SELECT id, name, photo_path, last_activity_at FROM users WHERE LOWER(role) IN ('admin', 'administrator') ORDER BY id ASC LIMIT 1");
         $adminId = (int)($adminRow['id'] ?? 0);
-        $pastorRow = $db->fetch("SELECT id, name, photo_path FROM users WHERE LOWER(COALESCE(role,'')) IN ('pastor','reverend','rev','minister') ORDER BY id ASC LIMIT 1");
+        $pastorRow = $db->fetch("SELECT id, name, photo_path, last_activity_at FROM users WHERE LOWER(COALESCE(role,'')) IN ('pastor','reverend','rev','minister') ORDER BY id ASC LIMIT 1");
         $pastorId = (int)($pastorRow['id'] ?? 0);
 
         $threads = [];
         if ($meRole === 'finance_staff' || $isDeptHead) {
             $financeHeadRow = $db->fetch(
-                "SELECT id, name, photo_path
+                "SELECT id, name, photo_path, last_activity_at
                  FROM users
                  WHERE LOWER(COALESCE(role,'')) IN ('finance_head','finance head','head_of_finance','head of finance')
                  ORDER BY id ASC
@@ -208,11 +286,16 @@ class ChatController extends BaseController {
                 $t = $this->getOrCreateThread($db, $me, $financeHeadId);
                 $threadId = (int)($t['id'] ?? 0);
                 $meta = $threadId > 0 ? $this->getThreadMeta($db, $threadId, $me) : $this->emptyThreadMeta();
+                $lastActivityAt = (string)($financeHeadRow['last_activity_at'] ?? '');
+                $ts = $lastActivityAt !== '' ? strtotime($lastActivityAt) : false;
+                $isOnline = $ts !== false && ($nowTs - (int)$ts) <= $onlineCutoffSeconds;
                 $threads[] = [
                     'thread_id' => $threadId,
                     'user_id' => $financeHeadId,
                     'name' => (string)($financeHeadRow['name'] ?? 'Head Of Finance'),
                     'photo_path' => (string)($financeHeadRow['photo_path'] ?? ''),
+                    'last_activity_at' => $lastActivityAt,
+                    'is_online' => $isOnline,
                     'last_message_at' => (string)($t['last_message_at'] ?? ''),
                     'unread_count' => (int)$meta['unread_count'],
                     'last_message_id' => (int)$meta['last_message_id'],
@@ -226,11 +309,16 @@ class ChatController extends BaseController {
             $t = $this->getOrCreateThread($db, $me, $adminId);
             $threadId = (int)($t['id'] ?? 0);
             $meta = $threadId > 0 ? $this->getThreadMeta($db, $threadId, $me) : $this->emptyThreadMeta();
+            $lastActivityAt = (string)($adminRow['last_activity_at'] ?? '');
+            $ts = $lastActivityAt !== '' ? strtotime($lastActivityAt) : false;
+            $isOnline = $ts !== false && ($nowTs - (int)$ts) <= $onlineCutoffSeconds;
             $threads[] = [
                 'thread_id' => $threadId,
                 'user_id' => $adminId,
                 'name' => (string)($adminRow['name'] ?? 'Admin'),
                 'photo_path' => (string)($adminRow['photo_path'] ?? ''),
+                'last_activity_at' => $lastActivityAt,
+                'is_online' => $isOnline,
                 'last_message_at' => (string)($t['last_message_at'] ?? ''),
                 'unread_count' => (int)$meta['unread_count'],
                 'last_message_id' => (int)$meta['last_message_id'],
@@ -243,11 +331,16 @@ class ChatController extends BaseController {
             $t = $this->getOrCreateThread($db, $me, $pastorId);
             $threadId = (int)($t['id'] ?? 0);
             $meta = $threadId > 0 ? $this->getThreadMeta($db, $threadId, $me) : $this->emptyThreadMeta();
+            $lastActivityAt = (string)($pastorRow['last_activity_at'] ?? '');
+            $ts = $lastActivityAt !== '' ? strtotime($lastActivityAt) : false;
+            $isOnline = $ts !== false && ($nowTs - (int)$ts) <= $onlineCutoffSeconds;
             $threads[] = [
                 'thread_id' => $threadId,
                 'user_id' => $pastorId,
                 'name' => (string)($pastorRow['name'] ?? 'Pastor'),
                 'photo_path' => (string)($pastorRow['photo_path'] ?? ''),
+                'last_activity_at' => $lastActivityAt,
+                'is_online' => $isOnline,
                 'last_message_at' => (string)($t['last_message_at'] ?? ''),
                 'unread_count' => (int)$meta['unread_count'],
                 'last_message_id' => (int)$meta['last_message_id'],
@@ -280,7 +373,8 @@ class ChatController extends BaseController {
 
         $a = (int)($thread['user_a'] ?? 0);
         $b = (int)($thread['user_b'] ?? 0);
-        if ($me !== $a && $me !== $b && !Auth::isAdmin()) {
+        $isParticipant = ($me === $a || $me === $b);
+        if (!$isParticipant && !Auth::isAdmin()) {
             $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
         }
 
@@ -289,7 +383,7 @@ class ChatController extends BaseController {
 
         $hideClause = '';
         $hideParams = [];
-        if (!Auth::isAdmin()) {
+        if ($isParticipant) {
             $notDeletedBySender = $db->isPgsql()
                 ? "COALESCE(m.deleted_by_sender, FALSE) = FALSE"
                 : "COALESCE(m.deleted_by_sender, 0) = 0";
@@ -547,6 +641,48 @@ class ChatController extends BaseController {
         $this->jsonResponse(['success' => true, 'mode' => 'me', 'message_id' => $messageId]);
     }
 
+    public function clearThread() {
+        if (Auth::isAuditor()) {
+            $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
+        }
+
+        $db = Database::getInstance();
+        $this->ensureChatSchema($db);
+
+        $me = (int)Session::get('user_id');
+        if ($me <= 0) {
+            $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
+        }
+
+        $threadId = (int)($_POST['thread_id'] ?? 0);
+        if ($threadId <= 0) {
+            $this->jsonResponse(['success' => false, 'message' => 'Invalid thread.'], 400);
+        }
+
+        $thread = $db->fetch("SELECT * FROM chat_threads WHERE id = ? LIMIT 1", [$threadId]);
+        if (!$thread) {
+            $this->jsonResponse(['success' => false, 'message' => 'Thread not found.'], 404);
+        }
+
+        $a = (int)($thread['user_a'] ?? 0);
+        $b = (int)($thread['user_b'] ?? 0);
+        $isParticipant = ($me === $a || $me === $b);
+        if (!$isParticipant && !Auth::isAdmin()) {
+            $this->jsonResponse(['success' => false, 'message' => 'Unauthorized access.'], 403);
+        }
+
+        $trueLit = $db->isPgsql() ? 'TRUE' : '1';
+
+        try {
+            $db->query("UPDATE chat_messages SET deleted_by_sender = $trueLit WHERE thread_id = ? AND sender_id = ?", [$threadId, $me]);
+            $db->query("UPDATE chat_messages SET deleted_by_recipient = $trueLit WHERE thread_id = ? AND sender_id <> ?", [$threadId, $me]);
+        } catch (Throwable $e) {
+            $this->jsonResponse(['success' => false, 'message' => 'Failed to clear chat.'], 500);
+        }
+
+        $this->jsonResponse(['success' => true, 'thread_id' => $threadId]);
+    }
+
     private function ensureChatSchema($db) {
         SchemaState::once('chat_schema_v1', function () use ($db) {
             if (!$db->tableExists('chat_threads')) {
@@ -627,6 +763,21 @@ class ChatController extends BaseController {
                 }
                 if (!$db->columnExists('chat_messages', 'deleted_at')) {
                     $db->query("ALTER TABLE chat_messages ADD COLUMN deleted_at " . ($db->isPgsql() ? 'TIMESTAMP' : 'DATETIME') . " NULL");
+                }
+
+                try {
+                    if ($db->isPgsql()) {
+                        $db->rawExec(
+                            "CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_id_id ON chat_messages (thread_id, id);
+                             CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_id_read_at ON chat_messages (thread_id, read_at);
+                             CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_id_sender_id ON chat_messages (thread_id, sender_id);"
+                        );
+                    } else {
+                        $db->rawExec("CREATE INDEX idx_chat_messages_thread_id_id ON chat_messages (thread_id, id)");
+                        $db->rawExec("CREATE INDEX idx_chat_messages_thread_id_read_at ON chat_messages (thread_id, read_at)");
+                        $db->rawExec("CREATE INDEX idx_chat_messages_thread_id_sender_id ON chat_messages (thread_id, sender_id)");
+                    }
+                } catch (Throwable $e) {
                 }
             }
         });

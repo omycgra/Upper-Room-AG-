@@ -317,6 +317,48 @@ class SettingController extends BaseController {
         $this->redirectSettings();
     }
 
+    public function updateUserPhoto() {
+        $this->isAdmin();
+
+        $db = Database::getInstance();
+        $this->ensureUserSchema($db);
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        if ($userId <= 0) {
+            Session::flash('error', 'Invalid user selected.');
+            $this->redirectSettings();
+        }
+
+        if (empty($_FILES['photo']['name'])) {
+            Session::flash('error', 'Please select a photo.');
+            $this->redirectSettings();
+        }
+
+        $user = $db->fetch("SELECT id, email, photo_path FROM users WHERE id = ? LIMIT 1", [$userId]);
+        if (!$user) {
+            Session::flash('error', 'User not found.');
+            $this->redirectSettings();
+        }
+
+        try {
+            $photoPath = $this->normalizeUploadPath($this->handleUserPhotoUpload($_FILES['photo']));
+            $oldPath = trim((string)($user['photo_path'] ?? ''));
+            if ($oldPath !== '') {
+                $oldFile = $this->resolveUploadFilePath($oldPath);
+                if ($oldFile !== '' && file_exists($oldFile)) {
+                    @unlink($oldFile);
+                }
+            }
+            $db->query("UPDATE users SET photo_path = ? WHERE id = ?", [$photoPath, $userId]);
+            AuditLog::log("Updated profile photo for user: " . ($user['email'] ?? 'Unknown'), "users", $userId);
+            Session::flash('success', 'Profile photo updated successfully.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to update photo: ' . $e->getMessage());
+        }
+
+        $this->redirectSettings();
+    }
+
     public function updateUserRole() {
         $this->isAdmin();
 
@@ -526,9 +568,12 @@ class SettingController extends BaseController {
             $old = $db->fetch("SELECT id, name, username, email, photo_path FROM users WHERE id = ?", [$userId]);
 
             if (!empty($_FILES['photo']['name'])) {
-                $photoPath = $this->handleUserPhotoUpload($_FILES['photo']);
-                if (!empty($old['photo_path']) && file_exists(ROOT_PATH . '/' . $old['photo_path'])) {
-                    unlink(ROOT_PATH . '/' . $old['photo_path']);
+                $photoPath = $this->normalizeUploadPath($this->handleUserPhotoUpload($_FILES['photo']));
+                if (!empty($old['photo_path'])) {
+                    $oldFile = $this->resolveUploadFilePath($old['photo_path']);
+                    if ($oldFile !== '' && file_exists($oldFile)) {
+                        @unlink($oldFile);
+                    }
                 }
                 $data['photo_path'] = $photoPath;
             }
@@ -823,6 +868,23 @@ class SettingController extends BaseController {
     }
 
     private function handleUserPhotoUpload($file) {
+        if (!is_array($file) || !isset($file['error'])) {
+            throw new Exception("Upload failed.");
+        }
+        $err = (int)$file['error'];
+        if ($err !== UPLOAD_ERR_OK) {
+            $map = [
+                UPLOAD_ERR_INI_SIZE => 'File is too large.',
+                UPLOAD_ERR_FORM_SIZE => 'File is too large.',
+                UPLOAD_ERR_PARTIAL => 'File upload was interrupted.',
+                UPLOAD_ERR_NO_FILE => 'No file selected.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Server temporary folder missing.',
+                UPLOAD_ERR_CANT_WRITE => 'Server failed to write file.',
+                UPLOAD_ERR_EXTENSION => 'Upload blocked by server extension.',
+            ];
+            throw new Exception($map[$err] ?? 'Upload failed.');
+        }
+
         $targetDir = "public/uploads/users/";
         if (!is_dir(ROOT_PATH . '/' . $targetDir)) {
             mkdir(ROOT_PATH . '/' . $targetDir, 0777, true);
@@ -841,15 +903,43 @@ class SettingController extends BaseController {
             throw new Exception("File is too large (max 2MB).");
         }
 
-        if ($fileExtension != "jpg" && $fileExtension != "png" && $fileExtension != "jpeg" && $fileExtension != "gif") {
-            throw new Exception("Only JPG, JPEG, PNG & GIF files are allowed.");
+        if (!in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            throw new Exception("Only JPG, JPEG, PNG, GIF & WEBP files are allowed.");
         }
 
-        if (move_uploaded_file($file["tmp_name"], ROOT_PATH . '/' . $targetFile)) {
-            return $targetFile;
+        if (!is_uploaded_file($file["tmp_name"])) {
+            throw new Exception("Upload failed.");
         }
 
-        throw new Exception("Failed to move uploaded file.");
+        if (!move_uploaded_file($file["tmp_name"], ROOT_PATH . '/' . $targetFile)) {
+            throw new Exception("Failed to save uploaded file.");
+        }
+
+        return $targetFile;
+    }
+
+    private function normalizeUploadPath($path) {
+        $p = str_replace('\\', '/', (string)$path);
+        $p = ltrim(trim($p), '/');
+        $posPublic = strpos($p, 'public/uploads/');
+        if ($posPublic !== false) {
+            return substr($p, $posPublic);
+        }
+        $posUploads = strpos($p, 'uploads/');
+        if ($posUploads !== false) {
+            return 'public/' . substr($p, $posUploads);
+        }
+        return $p;
+    }
+
+    private function resolveUploadFilePath($storedPath) {
+        $p = $this->normalizeUploadPath($storedPath);
+        if ($p === '') return '';
+        $full = ROOT_PATH . '/' . $p;
+        if (file_exists($full)) return $full;
+        $alt = ROOT_PATH . '/public/' . ltrim($p, '/');
+        if (file_exists($alt)) return $alt;
+        return $full;
     }
 
     private function handleChurchLogoUpload($file, $oldLogoPath = '') {
@@ -880,7 +970,7 @@ class SettingController extends BaseController {
         }
 
         $normalizedOld = ltrim((string)$oldLogoPath, '/');
-        if ($normalizedOld !== '' && str_starts_with($normalizedOld, 'public/uploads/branding/') && file_exists(ROOT_PATH . '/' . $normalizedOld)) {
+        if ($normalizedOld !== '' && substr($normalizedOld, 0, strlen('public/uploads/branding/')) === 'public/uploads/branding/' && file_exists(ROOT_PATH . '/' . $normalizedOld)) {
             @unlink(ROOT_PATH . '/' . $normalizedOld);
         }
 

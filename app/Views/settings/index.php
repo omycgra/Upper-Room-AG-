@@ -127,7 +127,11 @@
                         <div class="flex items-start justify-between gap-4">
                             <div class="flex items-center min-w-0">
                                 <div class="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center border border-white/10 mr-4 shrink-0">
-                                    <span class="text-accent font-black text-lg"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></span>
+                                    <?php if (!empty($user['photo_path'])): ?>
+                                        <img src="<?php echo htmlspecialchars(BASE_URL . '/' . ltrim((string)$user['photo_path'], '/')); ?>" class="w-full h-full object-cover" alt="">
+                                    <?php else: ?>
+                                        <span class="text-accent font-black text-lg"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></span>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="min-w-0">
                                     <p class="text-sm font-black text-slate-200 truncate"><?php echo $user['name']; ?></p>
@@ -165,6 +169,15 @@
                                             data-user-username="<?php echo htmlspecialchars((string)($user['username'] ?? '')); ?>"
                                             class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
                                             <i class="fas fa-at text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Edit Username</span>
+                                        </button>
+                                        <button type="button"
+                                            data-edit-user-photo="1"
+                                            data-user-id="<?php echo (int)$user['id']; ?>"
+                                            data-user-name="<?php echo htmlspecialchars((string)$user['name']); ?>"
+                                            data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
+                                            data-user-photo="<?php echo htmlspecialchars((string)($user['photo_path'] ?? '')); ?>"
+                                            class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
+                                            <i class="fas fa-camera text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Edit Photo</span>
                                         </button>
                                         <button type="button"
                                             data-edit-role="1"
@@ -215,7 +228,11 @@
                                 <td class="px-10 py-6">
                                     <div class="flex items-center">
                                         <div class="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center border border-white/10 group-hover:bg-accent transition-all duration-500 mr-4">
-                                            <span class="text-accent group-hover:text-slate-900 font-black text-lg transition-colors"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></span>
+                                            <?php if (!empty($user['photo_path'])): ?>
+                                                <img src="<?php echo htmlspecialchars(BASE_URL . '/' . ltrim((string)$user['photo_path'], '/')); ?>" class="w-full h-full object-cover rounded-2xl" alt="">
+                                            <?php else: ?>
+                                                <span class="text-accent group-hover:text-slate-900 font-black text-lg transition-colors"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></span>
+                                            <?php endif; ?>
                                         </div>
                                         <div>
                                             <p class="text-sm font-black text-slate-200 group-hover:text-white transition-colors tracking-tight"><?php echo $user['name']; ?></p>
@@ -257,6 +274,15 @@
                                                     data-user-username="<?php echo htmlspecialchars((string)($user['username'] ?? '')); ?>"
                                                     class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
                                                     <i class="fas fa-at text-xs"></i>
+                                                </button>
+                                                <button type="button"
+                                                    data-edit-user-photo="1"
+                                                    data-user-id="<?php echo (int)$user['id']; ?>"
+                                                    data-user-name="<?php echo htmlspecialchars((string)$user['name']); ?>"
+                                                    data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
+                                                    data-user-photo="<?php echo htmlspecialchars((string)($user['photo_path'] ?? '')); ?>"
+                                                    class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
+                                                    <i class="fas fa-camera text-xs"></i>
                                                 </button>
                                                 <button type="button"
                                                     data-edit-role="1"
@@ -939,6 +965,33 @@
     </div>
 </div>
 
+<div id="edit-user-photo-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-md rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center mb-10">
+            <div>
+                <h3 class="text-3xl font-black text-white tracking-tighter">Edit Photo</h3>
+                <p id="edit-user-photo-target" class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2"></p>
+            </div>
+            <button type="button" onclick="document.getElementById('edit-user-photo-modal').classList.add('hidden')" class="w-10 h-10 bg-white/5 hover:bg-accent hover:text-slate-900 text-slate-400 rounded-xl flex items-center justify-center transition-all border border-white/10">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <form action="<?php echo BASE_URL; ?>/settings/user/updatePhoto" method="POST" enctype="multipart/form-data" data-loader="top" class="space-y-8">
+            <input type="hidden" name="user_id" id="edit-user-photo-user-id" value="">
+            <div class="space-y-3">
+                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Profile Photo</label>
+                <div class="relative group">
+                    <i class="fas fa-camera absolute left-5 top-1/2 -translate-y-1/2 text-slate-600"></i>
+                    <input type="file" name="photo" accept="image/*" required class="w-full bg-white/5 border border-white/10 rounded-2xl pl-14 pr-6 py-4 text-[10px] font-black text-slate-400 transition-all outline-none file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:bg-accent file:text-slate-900 hover:file:bg-white cursor-pointer">
+                </div>
+            </div>
+            <button type="submit" class="w-full bg-accent text-slate-900 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                Update Photo
+            </button>
+        </form>
+    </div>
+</div>
+
 <div id="edit-role-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4">
     <div class="glass-card w-full max-w-md rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center mb-10">
@@ -1107,6 +1160,35 @@
             const btn = e.target.closest('[data-edit-username="1"]');
             if (!btn) return;
             open(btn.dataset.userId, btn.dataset.userName, btn.dataset.userEmail, btn.dataset.userUsername);
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.add('hidden');
+        });
+    })();
+</script>
+<?php endif; ?>
+
+<?php if ($isAdmin): ?>
+<script>
+    (function () {
+        const modal = document.getElementById('edit-user-photo-modal');
+        const userIdInput = document.getElementById('edit-user-photo-user-id');
+        const label = document.getElementById('edit-user-photo-target');
+        if (!modal || !userIdInput || !label) return;
+
+        const open = (id, name, email) => {
+            userIdInput.value = String(id || '');
+            const safeName = (name || '').trim();
+            const safeEmail = (email || '').trim();
+            label.textContent = safeName !== '' ? `${safeName} • ${safeEmail}` : safeEmail;
+            modal.classList.remove('hidden');
+        };
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-edit-user-photo="1"]');
+            if (!btn) return;
+            open(btn.dataset.userId, btn.dataset.userName, btn.dataset.userEmail);
         });
 
         modal.addEventListener('click', (e) => {

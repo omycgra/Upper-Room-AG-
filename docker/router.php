@@ -34,6 +34,14 @@ if ($normalizedPath !== '/' && is_file($filePath)) {
     return false;
 }
 
+if (str_starts_with($normalizedPath, '/uploads/')) {
+    $mapped = $docRoot . '/public' . $normalizedPath;
+    if (is_file($mapped)) {
+        $_SERVER['REQUEST_URI'] = '/public' . $normalizedPath;
+        return false;
+    }
+}
+
 $_SERVER['DOCUMENT_ROOT'] = $docRoot;
 $_SERVER['SCRIPT_NAME'] = '/index.php';
 $_SERVER['PHP_SELF'] = '/index.php';

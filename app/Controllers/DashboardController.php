@@ -45,6 +45,10 @@ class DashboardController extends BaseController {
             'mine' => []
         ];
 
+        if ($isVisitationTeam || (!$isDeptHead && !$isStaff && !$isVisitationTeam)) {
+            $this->ensureVisitorSchema();
+        }
+
         if ($isStaff) {
             if ($isFinance) {
                 $db = Database::getInstance();
@@ -108,7 +112,7 @@ class DashboardController extends BaseController {
         }
 
         if ($isVisitationTeam) {
-            $assignedVisitors = $visitorModel->getVisitationAssignments();
+            $assignedVisitors = $visitorModel->getVisitationAssignments(null, (int)Session::get('user_id'));
             $pending = 0;
             $completed = 0;
             $firstTime = 0;
@@ -332,6 +336,29 @@ class DashboardController extends BaseController {
                             CONSTRAINT fk_dep_expense_requests_finance FOREIGN KEY (finance_id) REFERENCES finances(id) ON DELETE SET NULL
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
                     );
+                }
+            }
+        });
+    }
+
+    private function ensureVisitorSchema() {
+        $db = Database::getInstance();
+        SchemaState::once('visitors_schema', function () use ($db) {
+            $columns = [
+                'service_attended' => "ALTER TABLE visitors ADD COLUMN service_attended VARCHAR(100) NULL",
+                'gender' => "ALTER TABLE visitors ADD COLUMN gender VARCHAR(20) NULL",
+                'address' => "ALTER TABLE visitors ADD COLUMN address TEXT NULL",
+                'is_first_time' => "ALTER TABLE visitors ADD COLUMN is_first_time BOOLEAN NULL DEFAULT TRUE",
+                'preferred_contact_method' => "ALTER TABLE visitors ADD COLUMN preferred_contact_method VARCHAR(30) NULL",
+                'follow_up_date' => "ALTER TABLE visitors ADD COLUMN follow_up_date DATE NULL",
+                'follow_up_notes' => "ALTER TABLE visitors ADD COLUMN follow_up_notes TEXT NULL",
+                'approved_by' => "ALTER TABLE visitors ADD COLUMN approved_by INT NULL",
+                'approved_at' => "ALTER TABLE visitors ADD COLUMN approved_at " . ($db->isPgsql() ? "TIMESTAMPTZ NULL" : "DATETIME NULL")
+            ];
+
+            foreach ($columns as $columnName => $sql) {
+                if (!$db->columnExists('visitors', $columnName)) {
+                    $db->query($sql);
                 }
             }
         });

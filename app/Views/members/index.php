@@ -154,11 +154,28 @@
             </div>
         <?php else: ?>
             <?php foreach ($members as $member): ?>
+                <?php
+                    $photoPath = str_replace('\\', '/', (string)($member['photo_path'] ?? ''));
+                    $photoPath = ltrim(trim($photoPath), '/');
+                    $posPublicUploads = strpos($photoPath, 'public/uploads/');
+                    if ($posPublicUploads !== false) {
+                        $photoPath = substr($photoPath, $posPublicUploads);
+                    } else {
+                        $posUploads = strpos($photoPath, 'uploads/');
+                        if ($posUploads !== false) {
+                            $photoPath = substr($photoPath, $posUploads);
+                        }
+                    }
+                    if ($photoPath !== '' && strpos($photoPath, 'uploads/') === 0) {
+                        $photoPath = 'public/' . $photoPath;
+                    }
+                    $memberPhotoUrl = $photoPath !== '' ? (BASE_URL . '/' . $photoPath) : '';
+                ?>
                 <div class="glass-card rounded-[2rem] p-4 sm:p-5 border-white/10">
                     <div class="flex items-start gap-4">
                         <div class="relative flex-shrink-0">
-                            <?php if ($member['photo_path']): ?>
-                                <img src="<?php echo BASE_URL . '/' . ltrim($member['photo_path'], '/'); ?>" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/10">
+                            <?php if ($memberPhotoUrl !== ''): ?>
+                                <img src="<?php echo htmlspecialchars($memberPhotoUrl); ?>" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/10">
                             <?php else: ?>
                                 <div class="w-14 h-14 bg-slate-800 border border-white/10 rounded-2xl flex items-center justify-center">
                                     <span class="text-accent font-black text-xl"><?php echo strtoupper(substr($member['first_name'], 0, 1)); ?></span>
@@ -231,12 +248,29 @@
                     </tr>
                 <?php else: ?>
                     <?php foreach ($members as $member): ?>
+                        <?php
+                            $photoPath = str_replace('\\', '/', (string)($member['photo_path'] ?? ''));
+                            $photoPath = ltrim(trim($photoPath), '/');
+                            $posPublicUploads = strpos($photoPath, 'public/uploads/');
+                            if ($posPublicUploads !== false) {
+                                $photoPath = substr($photoPath, $posPublicUploads);
+                            } else {
+                                $posUploads = strpos($photoPath, 'uploads/');
+                                if ($posUploads !== false) {
+                                    $photoPath = substr($photoPath, $posUploads);
+                                }
+                            }
+                            if ($photoPath !== '' && strpos($photoPath, 'uploads/') === 0) {
+                                $photoPath = 'public/' . $photoPath;
+                            }
+                            $memberPhotoUrl = $photoPath !== '' ? (BASE_URL . '/' . $photoPath) : '';
+                        ?>
                         <tr class="hover:bg-white/[0.03] transition-all duration-300 group">
                             <td class="px-10 py-6">
                                 <div class="flex items-center">
                                     <div class="relative flex-shrink-0">
-                                        <?php if ($member['photo_path']): ?>
-                                            <img src="<?php echo BASE_URL . '/' . ltrim($member['photo_path'], '/'); ?>" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/10 group-hover:border-accent transition-colors">
+                                        <?php if ($memberPhotoUrl !== ''): ?>
+                                            <img src="<?php echo htmlspecialchars($memberPhotoUrl); ?>" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/10 group-hover:border-accent transition-colors">
                                         <?php else: ?>
                                             <div class="w-14 h-14 bg-slate-800 border border-white/10 rounded-2xl flex items-center justify-center group-hover:bg-accent transition-all duration-500">
                                                 <span class="text-accent group-hover:text-slate-900 font-black text-xl transition-colors"><?php echo strtoupper(substr($member['first_name'], 0, 1)); ?></span>
@@ -1085,6 +1119,19 @@
         });
     }
 
+    function memberPhotoUrl(relative) {
+        const baseUrl = <?php echo json_encode(BASE_URL); ?>;
+        let p = String(relative || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+        if (!p) return '';
+        if (p.startsWith('http://') || p.startsWith('https://')) return p;
+        const publicIdx = p.indexOf('public/uploads/');
+        if (publicIdx >= 0) p = p.slice(publicIdx);
+        const uploadsIdx = p.indexOf('uploads/');
+        if (uploadsIdx >= 0 && publicIdx < 0) p = p.slice(uploadsIdx);
+        if (p.startsWith('uploads/')) p = 'public/' + p;
+        return baseUrl + '/' + p;
+    }
+
     async function viewMember(id) {
         const modal = document.getElementById('member-modal');
         const modalContent = document.getElementById('modal-content');
@@ -1104,7 +1151,11 @@
             
             const avatarContainer = document.getElementById('modal-avatar');
             if (data.photo_path) {
-                avatarContainer.innerHTML = `<img src="<?php echo BASE_URL; ?>/${data.photo_path}" class="w-full h-full rounded-[1.25rem] object-cover shadow-inner">`;
+                const src = memberPhotoUrl(data.photo_path);
+                avatarContainer.innerHTML = src ? `<img src="${src}" class="w-full h-full rounded-[1.25rem] object-cover shadow-inner">` : `
+                    <div class="w-full h-full bg-emerald-50 rounded-[1.25rem] flex items-center justify-center">
+                        <span class="text-emerald-700 font-black text-3xl">${data.first_name.charAt(0).toUpperCase()}</span>
+                    </div>`;
             } else {
                 avatarContainer.innerHTML = `
                     <div class="w-full h-full bg-emerald-50 rounded-[1.25rem] flex items-center justify-center">
@@ -1189,7 +1240,8 @@
             // Handle Photo Preview
             const preview = document.getElementById('edit-photo-preview');
             if (data.photo_path) {
-                preview.innerHTML = `<img src="<?php echo BASE_URL; ?>/${data.photo_path}" class="w-full h-full object-cover">`;
+                const src = memberPhotoUrl(data.photo_path);
+                preview.innerHTML = src ? `<img src="${src}" class="w-full h-full object-cover">` : `<i class="fas fa-camera text-gray-300 text-2xl group-hover:text-emerald-500"></i>`;
             } else {
                 preview.innerHTML = `<i class="fas fa-camera text-gray-300 text-2xl group-hover:text-emerald-500"></i>`;
             }

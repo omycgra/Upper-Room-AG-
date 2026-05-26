@@ -1,6 +1,8 @@
 RewriteEngine On
 RewriteBase /AG/
 
+RewriteRule ^uploads/(.*)$ public/uploads/$1 [L]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php [QSA,L]

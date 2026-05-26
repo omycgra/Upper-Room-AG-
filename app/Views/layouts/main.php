@@ -1110,6 +1110,12 @@
                                 <span class="ml-3 text-sm font-bold">Reports</span>
                             </a>
                         </li>
+                        <li>
+                            <a href="<?php echo BASE_URL; ?>/visitors" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'visitors') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                                <i class="fas fa-user-friends w-6 text-sm"></i>
+                                <span class="ml-3 text-sm font-bold">Visitors</span>
+                            </a>
+                        </li>
                     <?php elseif (!$isDeptHead && !$isStaff && !$isVisitationTeam): ?>
                         <li>
                             <a href="<?php echo BASE_URL; ?>/sms" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'sms') === 0 ? 'active-link' : 'text-slate-400'; ?>">
@@ -1155,9 +1161,25 @@
                         <div class="flex min-w-0 items-center space-x-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 sm:px-4">
                             <span class="hidden truncate text-xs font-bold text-slate-300 sm:inline"><?php echo Session::get('user_name', 'Admin'); ?></span>
                             <span class="truncate text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Profile</span>
+                            <?php
+                                $userPhotoPath = str_replace('\\', '/', (string)Session::get('user_photo', ''));
+                                $userPhotoPath = ltrim(trim($userPhotoPath), '/');
+                                $posPublicUploads = strpos($userPhotoPath, 'public/uploads/');
+                                if ($posPublicUploads !== false) {
+                                    $userPhotoPath = substr($userPhotoPath, $posPublicUploads);
+                                } else {
+                                    $posUploads = strpos($userPhotoPath, 'uploads/');
+                                    if ($posUploads !== false) {
+                                        $userPhotoPath = substr($userPhotoPath, $posUploads);
+                                    }
+                                }
+                                if ($userPhotoPath !== '' && strpos($userPhotoPath, 'uploads/') === 0) {
+                                    $userPhotoPath = 'public/' . $userPhotoPath;
+                                }
+                            ?>
                             <div class="w-8 h-8 bg-accent rounded-xl flex items-center justify-center overflow-hidden">
-                                <?php if (Session::get('user_photo')): ?>
-                                    <img src="<?php echo BASE_URL . '/' . Session::get('user_photo'); ?>" alt="Admin" class="w-full h-full object-cover">
+                                <?php if ($userPhotoPath !== ''): ?>
+                                    <img src="<?php echo BASE_URL . '/' . $userPhotoPath; ?>" alt="Admin" class="w-full h-full object-cover">
                                 <?php else: ?>
                                     <i class="fas fa-user text-slate-900 text-xs"></i>
                                 <?php endif; ?>
@@ -1184,8 +1206,8 @@
                                         </div>
                                     </button>
                                 </div>
-                                <div id="support-chat-panel" class="hidden fixed top-[5.75rem] left-4 right-4 bottom-4 sm:bottom-auto sm:left-auto sm:right-6 sm:w-[30rem] lg:w-[34rem] max-w-[92vw] z-[119]">
-                                    <div class="glass-card rounded-[2.5rem] border-white/10 overflow-hidden shadow-2xl h-full flex flex-col">
+                                <div id="support-chat-panel" class="hidden fixed inset-0 z-[119] bg-slate-950/60 backdrop-blur-xl">
+                                    <div class="glass-card rounded-none border-white/10 overflow-hidden shadow-2xl h-full w-full flex flex-col">
                                         <div class="px-6 py-5 bg-white/[0.03] border-b border-white/10 flex items-start justify-between gap-3 flex-shrink-0">
                                             <div class="min-w-0">
                                                 <p class="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Assistant</p>
@@ -1200,27 +1222,50 @@
                                                 </button>
                                             </div>
                                         </div>
-                                        <div id="support-pane-chat" class="p-4 sm:p-6 space-y-4 flex-1 min-h-0 flex flex-col">
-                                            <div id="chat-admin-mobile" class="hidden sm:hidden bg-white/5 border border-white/10 rounded-[2rem] px-4 py-4">
-                                                <label class="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2">Chat With</label>
-                                                <div class="relative">
-                                                    <select id="chat-contact-select" class="w-full bg-slate-950/40 border border-white/10 focus:border-accent rounded-2xl pl-4 pr-10 py-3 text-[11px] font-black text-slate-200 outline-none appearance-none"></select>
-                                                    <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
+                                        <div id="support-pane-chat" class="p-4 sm:p-6 space-y-4 flex-1 min-h-0 flex flex-col overflow-hidden">
+                                            <div class="grid grid-cols-1 sm:grid-cols-[18rem_minmax(0,1fr)] gap-4 flex-1 min-h-0">
+                                                <div id="chat-list-pane" class="bg-white/5 border border-white/10 rounded-[2rem] p-4 flex flex-col min-h-0">
+                                                    <div class="flex items-center justify-between gap-3">
+                                                        <p class="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Chats</p>
+                                                        <span id="chat-list-count" class="px-3 py-1.5 text-[9px] font-black rounded-full uppercase tracking-widest border bg-white/5 text-slate-300 border-white/10">0</span>
+                                                    </div>
+                                                    <div class="mt-4 relative">
+                                                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 text-[12px]"></i>
+                                                        <input id="chat-search" type="text" class="w-full bg-slate-950/40 border border-white/10 focus:border-accent rounded-2xl pl-11 pr-4 py-3 text-[11px] font-black text-slate-200 outline-none" placeholder="Search chats">
+                                                    </div>
+                                                    <div id="chat-threads" class="mt-4 flex-1 overflow-y-auto custom-scrollbar pr-1"></div>
                                                 </div>
-                                            </div>
-                                            <div class="grid grid-cols-1 sm:grid-cols-[10rem_minmax(0,1fr)] gap-4 flex-1 min-h-0">
-                                                <div id="chat-threads" class="hidden sm:block bg-white/5 border border-white/10 rounded-[2rem] p-3 h-full max-h-[520px] overflow-y-auto custom-scrollbar"></div>
-                                                <div class="flex flex-col bg-white/5 border border-white/10 rounded-[2rem] p-3 flex-1 min-h-0 sm:max-h-[520px]">
-                                                    <div id="chat-messages" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1"></div>
-                                                    <form id="chat-form" class="mt-3 flex items-center gap-2">
+                                                <div id="chat-convo-pane" class="hidden flex bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden flex-col min-h-0">
+                                                    <div class="px-4 py-4 bg-white/[0.03] border-b border-white/10 flex items-center justify-between gap-3 flex-shrink-0">
+                                                        <div class="flex items-center gap-3 min-w-0">
+                                                            <button type="button" id="chat-mobile-back" class="sm:hidden w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10">
+                                                                <i class="fas fa-arrow-left text-sm"></i>
+                                                            </button>
+                                                            <div id="chat-active-avatar" class="relative w-10 h-10 rounded-2xl overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center shrink-0"></div>
+                                                            <div class="min-w-0">
+                                                                <p id="chat-active-name" class="text-sm font-black text-slate-200 truncate">Select a chat</p>
+                                                                <p id="chat-active-status" class="text-[10px] font-black uppercase tracking-widest text-slate-500 truncate"></p>
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex items-center gap-2">
+                                                            <button type="button" id="chat-refresh" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10">
+                                                                <i class="fas fa-rotate text-sm"></i>
+                                                            </button>
+                                                            <button type="button" id="chat-clear" class="w-10 h-10 inline-flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10">
+                                                                <i class="fas fa-trash-can text-sm"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div id="chat-messages" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 p-4 sm:p-5" style="background-image: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.06), transparent 45%), radial-gradient(circle at 70% 80%, rgba(255,255,255,0.05), transparent 50%);"></div>
+                                                    <form id="chat-form" class="p-4 sm:p-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-white/10 flex items-center gap-3 flex-shrink-0 bg-slate-950/20">
                                                         <input id="chat-input" type="text" class="flex-1 bg-slate-950/50 border border-white/10 focus:border-accent rounded-2xl px-4 py-3 text-sm font-bold text-white outline-none" placeholder="Type a message">
-                                                        <button type="submit" class="h-12 px-5 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest">
+                                                        <button type="submit" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest">
                                                             Send
                                                         </button>
                                                     </form>
                                                 </div>
                                             </div>
-                                            <p id="chat-hint" class="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                            <p id="chat-hint" class="hidden sm:block text-[10px] font-black uppercase tracking-widest text-slate-500">
                                                 <?php if (Auth::isAdmin()): ?>
                                                     Admin can chat with everyone.
                                                 <?php elseif (Auth::isFinanceHead()): ?>
@@ -2018,13 +2063,21 @@
                 const toastTitle = document.getElementById('chat-toast-title');
                 const toastName = document.getElementById('chat-toast-name');
                 const toastPreview = document.getElementById('chat-toast-preview');
-                const adminMobileWrap = document.getElementById('chat-admin-mobile');
-                const adminMobileSelect = document.getElementById('chat-contact-select');
 
                 const threadsEl = document.getElementById('chat-threads');
                 const chatList = document.getElementById('chat-messages');
                 const chatForm = document.getElementById('chat-form');
                 const chatInput = document.getElementById('chat-input');
+                const chatSearch = document.getElementById('chat-search');
+                const chatListCount = document.getElementById('chat-list-count');
+                const chatListPane = document.getElementById('chat-list-pane');
+                const chatConvoPane = document.getElementById('chat-convo-pane');
+                const chatMobileBack = document.getElementById('chat-mobile-back');
+                const chatActiveAvatar = document.getElementById('chat-active-avatar');
+                const chatActiveName = document.getElementById('chat-active-name');
+                const chatActiveStatus = document.getElementById('chat-active-status');
+                const chatRefresh = document.getElementById('chat-refresh');
+                const chatClear = document.getElementById('chat-clear');
 
                 if (!widget || !toggle || !panel) return;
 
@@ -2040,12 +2093,23 @@
                 let audioCtx = null;
                 let desktopNotifyEnabled = false;
                 const desktopNotifyKey = 'chatDesktopNotify';
+                let threadsCacheByThreadId = {};
+                let threadsCacheByUserId = {};
+                let allThreads = [];
+                let chatSearchTerm = '';
+                const onlineCutoffMs = 10 * 60 * 1000;
 
                 const photoUrl = function (relative) {
-                    const p = String(relative || '').trim();
+                    let p = String(relative || '').trim();
                     if (!p) return '';
                     if (p.startsWith('http://') || p.startsWith('https://')) return p;
-                    return baseUrl + '/' + p.replace(/^\/+/, '');
+                    p = p.replace(/\\/g, '/').replace(/^\/+/, '');
+                    const publicIdx = p.indexOf('public/uploads/');
+                    if (publicIdx >= 0) p = p.slice(publicIdx);
+                    const uploadsIdx = p.indexOf('uploads/');
+                    if (uploadsIdx >= 0 && publicIdx < 0) p = p.slice(uploadsIdx);
+                    if (p.startsWith('uploads/')) p = 'public/' + p;
+                    return baseUrl + '/' + p;
                 };
 
                 const escapeHtml = function (text) {
@@ -2083,6 +2147,52 @@
                 const isPanelOpen = function () {
                     return !panel.classList.contains('hidden');
                 };
+
+                const isMobile = function () {
+                    return window.innerWidth < 640;
+                };
+
+                let lastIsMobile = isMobile();
+                let resizeTimer = null;
+
+                const showListView = function () {
+                    if (!isMobile()) {
+                        chatListPane?.classList.remove('hidden');
+                        chatConvoPane?.classList.remove('hidden');
+                        return;
+                    }
+                    chatListPane?.classList.remove('hidden');
+                    chatConvoPane?.classList.add('hidden');
+                };
+
+                const showConversationView = function () {
+                    if (!isMobile()) return;
+                    chatListPane?.classList.add('hidden');
+                    chatConvoPane?.classList.remove('hidden');
+                };
+
+                window.addEventListener('resize', function () {
+                    if (resizeTimer) window.clearTimeout(resizeTimer);
+                    resizeTimer = window.setTimeout(function () {
+                        if (!isPanelOpen()) return;
+                        const nowMobile = isMobile();
+                        if (nowMobile !== lastIsMobile) {
+                            lastIsMobile = nowMobile;
+                            if (nowMobile) {
+                                if (activeThreadId > 0 || activeToUserId > 0) showConversationView();
+                                else showListView();
+                            } else {
+                                showListView();
+                            }
+                        }
+                        if (threadsEl && allThreads && allThreads.length > 0) {
+                            renderThreads(allThreads);
+                        }
+                        window.setTimeout(function () {
+                            scrollToBottom(chatList);
+                        }, 50);
+                    }, 120);
+                });
 
                 const setBadge = function (count) {
                     const c = Number(count || 0);
@@ -2182,6 +2292,8 @@
                     const wrapper = document.createElement('div');
                     wrapper.className = 'flex items-end gap-2 ' + (isMine ? 'justify-end' : 'justify-start');
                     if (messageId > 0) wrapper.dataset.messageId = String(messageId);
+                    const clientTempId = String(msg.client_temp_id || '').trim();
+                    if (clientTempId) wrapper.dataset.clientTempId = clientTempId;
 
                     if (!isMine) {
                         const avatar = document.createElement('div');
@@ -2195,8 +2307,8 @@
 
                     const bubble = document.createElement('div');
                     bubble.className = (isMine
-                        ? 'max-w-[78%] rounded-2xl bg-accent text-slate-900 px-4 py-3 text-sm font-bold relative'
-                        : 'max-w-[78%] rounded-2xl bg-slate-950/40 border border-white/10 text-slate-200 px-4 py-3 text-sm font-bold relative');
+                        ? 'max-w-[82%] rounded-2xl bg-accent text-slate-900 px-4 py-3 text-sm font-bold relative group'
+                        : 'max-w-[82%] rounded-2xl bg-slate-950/40 border border-white/10 text-slate-200 px-4 py-3 text-sm font-bold relative group');
 
                     const textWrap = document.createElement('div');
                     textWrap.className = deletedForAll ? 'text-[12px] font-black text-slate-300 italic' : '';
@@ -2205,11 +2317,25 @@
 
                     const menuBtn = document.createElement('button');
                     menuBtn.type = 'button';
-                    menuBtn.className = 'absolute -top-3 -right-3 w-9 h-9 rounded-2xl bg-white/10 border border-white/10 text-slate-300 hover:bg-white/20 flex items-center justify-center';
+                    menuBtn.className = 'absolute -top-3 -right-3 w-9 h-9 rounded-2xl bg-white/10 border border-white/10 text-slate-300 hover:bg-white/20 items-center justify-center flex opacity-100 pointer-events-auto sm:opacity-0 sm:pointer-events-none sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto';
                     menuBtn.innerHTML = '<i class="fas fa-ellipsis-vertical text-[11px]"></i>';
                     menuBtn.setAttribute('aria-label', 'Message options');
                     bubble.appendChild(menuBtn);
                     wrapper.appendChild(bubble);
+
+                    const timeEl = document.createElement('div');
+                    timeEl.className = 'mt-2 text-[10px] font-black uppercase tracking-widest ' + (isMine ? 'text-slate-900/60 text-right' : 'text-slate-500 text-right');
+                    const createdAt = String(msg.created_at || '').trim();
+                    if (createdAt) {
+                        const ts = Date.parse(createdAt);
+                        if (!Number.isNaN(ts)) {
+                            const d = new Date(ts);
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            timeEl.textContent = `${hh}:${mm}`;
+                        }
+                    }
+                    bubble.appendChild(timeEl);
 
                     const deleteChatMessage = async function (id, mode) {
                         const body = new URLSearchParams();
@@ -2272,15 +2398,53 @@
                     if (isMine) {
                         const avatar = document.createElement('div');
                         avatar.className = 'w-8 h-8 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center';
-                        const src = photoUrl(mePhoto);
+                        const src = photoUrl(mePhoto || '');
                         avatar.innerHTML = src
                             ? `<img src="${src}" class="w-full h-full object-cover" alt="">`
-                            : `<i class="fas fa-user text-slate-500 text-xs"></i>`;
+                            : `<i class="fas fa-user text-slate-900/60 text-xs"></i>`;
                         wrapper.appendChild(avatar);
                     }
 
                     chatList.appendChild(wrapper);
                     scrollToBottom(chatList);
+                    return wrapper;
+                };
+
+                const setActiveHeader = function (thread) {
+                    if (!chatActiveName || !chatActiveStatus || !chatActiveAvatar) return;
+                    if (!thread) {
+                        chatActiveName.textContent = 'Select a chat';
+                        chatActiveStatus.textContent = '';
+                        chatActiveAvatar.innerHTML = `<i class="fas fa-user text-slate-500"></i>`;
+                        return;
+                    }
+                    const name = String(thread.name || '').trim();
+                    chatActiveName.textContent = name || 'Chat';
+                    const isOnline = Boolean(thread.is_online);
+                    if (isOnline) {
+                        chatActiveStatus.textContent = 'Online';
+                    } else {
+                        const lastActivity = String(thread.last_activity_at || '').trim();
+                        const ts = lastActivity ? Date.parse(lastActivity) : NaN;
+                        if (!Number.isNaN(ts)) {
+                            const delta = Date.now() - ts;
+                            if (delta < 24 * 60 * 60 * 1000) {
+                                const d = new Date(ts);
+                                const hh = String(d.getHours()).padStart(2, '0');
+                                const mm = String(d.getMinutes()).padStart(2, '0');
+                                chatActiveStatus.textContent = `Last seen ${hh}:${mm}`;
+                            } else {
+                                chatActiveStatus.textContent = 'Offline';
+                            }
+                        } else {
+                            chatActiveStatus.textContent = 'Offline';
+                        }
+                    }
+                    const src = photoUrl(thread.photo_path || '');
+                    const dot = isOnline ? `<span class="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border border-slate-900 shadow-[0_0_10px_rgba(52,211,153,0.55)]"></span>` : '';
+                    chatActiveAvatar.innerHTML = src
+                        ? `<img src="${src}" class="w-full h-full object-cover" alt="">${dot}`
+                        : `<i class="fas fa-user text-slate-500"></i>${dot}`;
                 };
 
                 const setActiveThread = function (threadId, toUserId) {
@@ -2297,38 +2461,23 @@
                             chatList.appendChild(hint);
                         }
                     }
+                    const t = activeThreadId > 0 ? threadsCacheByThreadId[activeThreadId] : (activeToUserId > 0 ? threadsCacheByUserId[activeToUserId] : null);
+                    setActiveHeader(t || null);
                     if (activeThreadId > 0) loadMessages(activeThreadId, false);
+                    showConversationView();
                 };
 
                 const renderThreads = function (threads) {
-                    const canPickThread = isAdmin || isFinanceHead || (Array.isArray(threads) && threads.length > 1);
-
-                    if (adminMobileWrap && adminMobileSelect) {
-                        adminMobileWrap.classList.toggle('hidden', !canPickThread);
-                        const selectedValue = (function () {
-                            if (activeThreadId > 0) return 't:' + String(activeThreadId);
-                            if (activeToUserId > 0) return 'u:' + String(activeToUserId);
-                            return String(adminMobileSelect.value || '');
-                        })();
-                        adminMobileSelect.innerHTML = '';
-                        (threads || []).forEach((t) => {
-                            const opt = document.createElement('option');
-                            const tid = Number(t.thread_id || 0);
-                            const uid = Number(t.user_id || 0);
-                            opt.value = (tid > 0) ? ('t:' + String(tid)) : ('u:' + String(uid));
-                            const unread = Number(t.unread_count || 0);
-                            const label = String(t.name || '') + (unread > 0 ? ` (${unread})` : '');
-                            opt.textContent = label;
-                            adminMobileSelect.appendChild(opt);
-                        });
-                        if (selectedValue) adminMobileSelect.value = selectedValue;
-                    }
-
                     if (!threadsEl) return;
-                    threadsEl.classList.toggle('hidden', !canPickThread);
-                    if (!canPickThread) return;
+                    const list = Array.isArray(threads) ? threads : [];
+                    const filtered = (function () {
+                        const term = String(chatSearchTerm || '').trim().toLowerCase();
+                        if (!term) return list;
+                        return list.filter((t) => String(t.name || '').toLowerCase().includes(term));
+                    })();
+                    if (chatListCount) chatListCount.textContent = String(filtered.length);
                     threadsEl.innerHTML = '';
-                    threads.forEach((t) => {
+                    filtered.forEach((t) => {
                         const btn = document.createElement('button');
                         btn.type = 'button';
                         const isActive = Number(t.thread_id || 0) === Number(activeThreadId || 0);
@@ -2337,9 +2486,11 @@
                             (isActive ? 'bg-white/10 border-white/10' : 'hover:bg-white/10 border-white/5');
                         const src = photoUrl(t.photo_path || '');
                         const preview = String(t.last_message || '').trim();
+                        const isOnline = Boolean(t.is_online);
                         btn.innerHTML = `
-                            <div class="w-9 h-9 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                            <div class="relative w-9 h-9 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
                                 ${src ? `<img src="${src}" class="w-full h-full object-cover" alt="">` : `<i class="fas fa-user text-slate-500 text-xs"></i>`}
+                                ${isOnline ? `<span class="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border border-slate-900 shadow-[0_0_10px_rgba(52,211,153,0.55)]"></span>` : ''}
                             </div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center justify-between gap-2">
@@ -2365,6 +2516,20 @@
                         const data = await res.json().catch(() => null);
                         if (!res.ok || !data || data.success !== true) return;
                         const threads = Array.isArray(data.threads) ? data.threads : [];
+                        allThreads = threads;
+                        threadsCacheByThreadId = {};
+                        threadsCacheByUserId = {};
+                        threads.forEach((t) => {
+                            const tid = Number(t.thread_id || 0);
+                            const uid = Number(t.user_id || 0);
+                            if (tid > 0) threadsCacheByThreadId[tid] = t;
+                            if (uid > 0) threadsCacheByUserId[uid] = t;
+                        });
+                        if (activeThreadId > 0 && threadsCacheByThreadId[activeThreadId]) {
+                            setActiveHeader(threadsCacheByThreadId[activeThreadId]);
+                        } else if (activeToUserId > 0 && threadsCacheByUserId[activeToUserId]) {
+                            setActiveHeader(threadsCacheByUserId[activeToUserId]);
+                        }
 
                         let newUnreadTotal = 0;
                         let newestThread = null;
@@ -2441,6 +2606,16 @@
                     if (!text) return;
                     if (activeThreadId <= 0 && activeToUserId <= 0) return;
 
+                    const tempId = 'tmp_' + String(Date.now()) + '_' + String(Math.floor(Math.random() * 10000));
+                    const optimisticWrapper = addChatBubble({
+                        id: 0,
+                        sender_id: meId,
+                        message: text,
+                        created_at: new Date().toISOString(),
+                        deleted_for_all: false,
+                        client_temp_id: tempId
+                    });
+
                     const body = new URLSearchParams();
                     if (activeThreadId > 0) body.set('thread_id', String(activeThreadId));
                     if (activeThreadId <= 0 && activeToUserId > 0) body.set('to_user_id', String(activeToUserId));
@@ -2459,10 +2634,18 @@
                         });
                         const data = await res.json().catch(() => null);
                         if (!res.ok || !data || data.success !== true) return;
-                        activeThreadId = Number(data.thread_id || activeThreadId);
-                        activeLastId = 0;
-                        renderedMessageIds = new Set();
-                        if (activeThreadId > 0) loadMessages(activeThreadId, false);
+                        const newThreadId = Number(data.thread_id || activeThreadId);
+                        const newMessageId = Number(data.message_id || 0);
+                        if (newMessageId > 0) {
+                            renderedMessageIds.add(newMessageId);
+                            if (optimisticWrapper) {
+                                optimisticWrapper.dataset.messageId = String(newMessageId);
+                                delete optimisticWrapper.dataset.clientTempId;
+                            }
+                            if (newMessageId > activeLastId) activeLastId = newMessageId;
+                        }
+                        activeThreadId = newThreadId;
+                        if (activeThreadId > 0) loadMessages(activeThreadId, true);
                         loadThreads(true);
                     } catch (e) {
                     }
@@ -2472,6 +2655,7 @@
                     panel.classList.remove('hidden');
                     hideToast();
                     loadThreads(true);
+                    showListView();
                     if (pollMessagesTimer) window.clearInterval(pollMessagesTimer);
                     pollMessagesTimer = window.setInterval(function () {
                         if (!isPanelOpen()) return;
@@ -2493,21 +2677,51 @@
                 });
                 closeBtn?.addEventListener('click', closePanel);
 
+                chatMobileBack?.addEventListener('click', function () {
+                    showListView();
+                });
+
+                chatSearch?.addEventListener('input', function () {
+                    chatSearchTerm = String(chatSearch.value || '');
+                    renderThreads(allThreads);
+                });
+
+                chatRefresh?.addEventListener('click', function () {
+                    loadThreads(true);
+                    if (activeThreadId > 0) loadMessages(activeThreadId, true);
+                });
+
+                chatClear?.addEventListener('click', async function () {
+                    if (activeThreadId <= 0) return;
+                    const ok = window.confirm('Clear this chat for you only?');
+                    if (!ok) return;
+                    const body = new URLSearchParams();
+                    body.set('thread_id', String(activeThreadId));
+                    const res = await fetch(baseUrl + '/chat/clear', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                        },
+                        body: body.toString()
+                    });
+                    const data = await res.json().catch(() => null);
+                    if (!res.ok || !data || data.success !== true) return;
+                    activeLastId = 0;
+                    renderedMessageIds = new Set();
+                    if (chatList) {
+                        chatList.innerHTML = '';
+                        const hint = document.createElement('div');
+                        hint.className = 'rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-[11px] font-bold text-slate-400';
+                        hint.textContent = 'Chat cleared. Type a message to continue.';
+                        chatList.appendChild(hint);
+                    }
+                    loadThreads(true);
+                });
+
                 chatForm?.addEventListener('submit', function (e) {
                     e.preventDefault();
                     sendChatMessage();
-                });
-
-                adminMobileSelect?.addEventListener('change', function () {
-                    if (adminMobileWrap && adminMobileWrap.classList.contains('hidden')) return;
-                    const raw = String(adminMobileSelect.value || '');
-                    const parts = raw.split(':');
-                    if (parts.length !== 2) return;
-                    const kind = parts[0];
-                    const id = Number(parts[1] || 0);
-                    if (id <= 0) return;
-                    if (kind === 't') setActiveThread(id, 0);
-                    if (kind === 'u') setActiveThread(0, id);
                 });
 
                 toastBtn?.addEventListener('click', function () {

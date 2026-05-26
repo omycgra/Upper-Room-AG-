@@ -276,6 +276,7 @@
     <?php
         $visitationSummary = $visitation['summary'] ?? [];
         $assignedVisitors = $visitation['visitors'] ?? [];
+        $meId = (int)Session::get('user_id');
     ?>
 
     <div class="glass-card rounded-[3rem] border-white/5 overflow-hidden mb-10">
@@ -344,6 +345,10 @@
                         </thead>
                         <tbody class="divide-y divide-white/5">
                             <?php foreach ($assignedVisitors as $visitor): ?>
+                                <?php
+                                    $isApproved = !empty($visitor['approved_at']);
+                                    $isAssignedToMe = (int)($visitor['assigned_to'] ?? 0) === $meId;
+                                ?>
                                 <tr class="hover:bg-white/[0.03] transition-colors">
                                     <td class="py-5 pr-5">
                                         <p class="text-sm font-black text-white"><?php echo htmlspecialchars(trim(($visitor['first_name'] ?? '') . ' ' . ($visitor['last_name'] ?? ''))); ?></p>
@@ -352,12 +357,31 @@
                                     <td class="py-5 pr-5 text-sm font-bold text-slate-300"><?php echo !empty($visitor['visit_date']) ? htmlspecialchars(date('M d, Y', strtotime($visitor['visit_date']))) : 'Not set'; ?></td>
                                     <td class="py-5 pr-5 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($visitor['service_attended'] ?? 'Not specified'); ?></td>
                                     <td class="py-5 pr-5">
-                                        <p class="text-sm font-bold text-slate-300"><?php echo htmlspecialchars($visitor['phone'] ?: ($visitor['email'] ?? 'No contact')); ?></p>
-                                        <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2"><?php echo htmlspecialchars($visitor['preferred_contact_method'] ?? 'Method not set'); ?></p>
+                                        <?php if (!$isApproved): ?>
+                                            <p class="text-sm font-bold text-slate-400">Hidden until approved</p>
+                                            <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest mt-2">Approve to view contact</p>
+                                        <?php else: ?>
+                                            <p class="text-sm font-bold text-slate-300"><?php echo htmlspecialchars($visitor['phone'] ?: ($visitor['email'] ?? 'No contact')); ?></p>
+                                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2"><?php echo htmlspecialchars($visitor['preferred_contact_method'] ?? 'Method not set'); ?></p>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="py-5 pr-5">
                                         <p class="text-sm font-black text-white"><?php echo htmlspecialchars($visitor['assigned_to_name'] ?? 'Unassigned'); ?></p>
                                         <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2"><?php echo htmlspecialchars($visitor['assigned_department_name'] ?? 'Visitation'); ?></p>
+                                        <div class="mt-3">
+                                            <?php if ($isAssignedToMe && !$isApproved): ?>
+                                                <form action="<?php echo BASE_URL; ?>/visitors/approve" method="POST" data-loader="top">
+                                                    <input type="hidden" name="visitor_id" value="<?php echo (int)($visitor['id'] ?? 0); ?>">
+                                                    <button type="submit" class="h-9 px-4 rounded-xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest">
+                                                        Approve
+                                                    </button>
+                                                </form>
+                                            <?php elseif ($isApproved): ?>
+                                                <a href="<?php echo BASE_URL; ?>/visitors/details?id=<?php echo (int)($visitor['id'] ?? 0); ?>" class="h-9 px-4 inline-flex items-center justify-center rounded-xl bg-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest border border-white/10">
+                                                    Details
+                                                </a>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                     <td class="py-5 pr-5">
                                         <p class="text-sm font-bold text-slate-300"><?php echo htmlspecialchars($visitor['follow_up_status'] ?? 'Pending'); ?></p>
@@ -372,6 +396,10 @@
 
                 <div class="xl:hidden space-y-4">
                     <?php foreach ($assignedVisitors as $visitor): ?>
+                        <?php
+                            $isApproved = !empty($visitor['approved_at']);
+                            $isAssignedToMe = (int)($visitor['assigned_to'] ?? 0) === $meId;
+                        ?>
                         <div class="glass-card p-5 rounded-[2rem] border-white/5">
                             <div class="flex items-start justify-between gap-4">
                                 <div>
@@ -393,7 +421,13 @@
                                 </div>
                                 <div class="bg-white/5 rounded-2xl border border-white/5 px-4 py-3">
                                     <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contact</p>
-                                    <p class="mt-2"><?php echo htmlspecialchars($visitor['phone'] ?: ($visitor['email'] ?? 'No contact')); ?></p>
+                                    <p class="mt-2">
+                                        <?php if (!$isApproved): ?>
+                                            Hidden until approved
+                                        <?php else: ?>
+                                            <?php echo htmlspecialchars($visitor['phone'] ?: ($visitor['email'] ?? 'No contact')); ?>
+                                        <?php endif; ?>
+                                    </p>
                                 </div>
                                 <div class="bg-white/5 rounded-2xl border border-white/5 px-4 py-3">
                                     <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Follow-Up Date</p>
@@ -402,6 +436,20 @@
                             </div>
                             <div class="mt-4 text-sm font-bold text-slate-300">
                                 <?php echo htmlspecialchars($visitor['follow_up_notes'] ?? ($visitor['prayer_request'] ?? 'No notes recorded.')); ?>
+                            </div>
+                            <div class="mt-5">
+                                <?php if ($isAssignedToMe && !$isApproved): ?>
+                                    <form action="<?php echo BASE_URL; ?>/visitors/approve" method="POST" data-loader="top">
+                                        <input type="hidden" name="visitor_id" value="<?php echo (int)($visitor['id'] ?? 0); ?>">
+                                        <button type="submit" class="w-full h-11 px-5 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow">
+                                            Approve
+                                        </button>
+                                    </form>
+                                <?php elseif ($isApproved): ?>
+                                    <a href="<?php echo BASE_URL; ?>/visitors/details?id=<?php echo (int)($visitor['id'] ?? 0); ?>" class="w-full h-11 px-5 rounded-2xl bg-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest border border-white/10 inline-flex items-center justify-center hover:bg-white/15 transition-all">
+                                        View Details
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>

@@ -18,6 +18,12 @@ class BaseController {
                 $now = time();
                 if ($lastPing <= 0 || ($now - $lastPing) >= 30) {
                     $db->query("UPDATE users SET last_activity_at = NOW() WHERE id = ?", [$userId]);
+                    $row = $db->fetch("SELECT photo_path FROM users WHERE id = ? LIMIT 1", [$userId]);
+                    $photoPath = trim((string)($row['photo_path'] ?? ''));
+                    $sessionPhoto = trim((string)Session::get('user_photo', ''));
+                    if ($photoPath !== $sessionPhoto) {
+                        Session::set('user_photo', $photoPath !== '' ? $photoPath : null);
+                    }
                     Session::set('last_activity_ping', $now);
                 }
             }
@@ -51,7 +57,9 @@ class BaseController {
                 'finance/updateBankDetails',
                 'chat/threads',
                 'chat/messages',
-                'chat/send'
+                'chat/send',
+                'chat/delete',
+                'chat/clear'
             ];
             $this->guardRoute($currentRoute, $allowed);
         }
@@ -67,7 +75,9 @@ class BaseController {
                 'finance/updateTransaction',
                 'chat/threads',
                 'chat/messages',
-                'chat/send'
+                'chat/send',
+                'chat/delete',
+                'chat/clear'
             ];
             $allowed[] = 'finance/myRequestUpdates';
             if (Auth::isFinanceHead()) {
@@ -86,10 +96,15 @@ class BaseController {
             $allowed = [
                 'dashboard',
                 'logout',
+                'visitors',
+                'visitors/details',
+                'visitors/approve',
                 'visitors/export',
                 'chat/threads',
                 'chat/messages',
-                'chat/send'
+                'chat/send',
+                'chat/delete',
+                'chat/clear'
             ];
             $this->guardRoute($currentRoute, $allowed);
         }
@@ -98,11 +113,16 @@ class BaseController {
             $allowed = [
                 'pastor',
                 'logout',
+                'visitors',
+                'visitors/details',
+                'visitors/assign',
                 'reports',
                 'reports/download',
                 'chat/threads',
                 'chat/messages',
-                'chat/send'
+                'chat/send',
+                'chat/delete',
+                'chat/clear'
             ];
             $this->guardRoute($currentRoute, $allowed);
         }

@@ -31,6 +31,9 @@ class Router {
         $this->add('visitors/add', 'VisitorController@add');
         $this->add('visitors/store', 'VisitorController@store');
         $this->add('visitors/export', 'VisitorController@exportAssigned');
+        $this->add('visitors/approve', 'VisitorController@approve');
+        $this->add('visitors/details', 'VisitorController@details');
+        $this->add('visitors/assign', 'VisitorController@assign');
         $this->add('attendance', 'AttendanceController@index');
         $this->add('attendance/mark', 'AttendanceController@mark');
         $this->add('attendance/store', 'AttendanceController@store');
@@ -61,6 +64,7 @@ class Router {
         $this->add('chat/messages', 'ChatController@messages');
         $this->add('chat/send', 'ChatController@send');
         $this->add('chat/delete', 'ChatController@deleteMessage');
+        $this->add('chat/clear', 'ChatController@clearThread');
         $this->add('settings', 'SettingController@index');
         $this->add('settings/updateBranding', 'SettingController@updateBranding');
         $this->add('settings/updateChurchName', 'SettingController@updateChurchName');
@@ -74,6 +78,7 @@ class Router {
         $this->add('settings/user/resetPassword', 'SettingController@resetUserPassword');
         $this->add('settings/user/updateUsername', 'SettingController@updateUserUsername');
         $this->add('settings/user/updateRole', 'SettingController@updateUserRole');
+        $this->add('settings/user/updatePhoto', 'SettingController@updateUserPhoto');
         $this->add('settings/user/approvePasswordReset', 'SettingController@approvePasswordReset');
         $this->add('settings/user/rejectPasswordReset', 'SettingController@rejectPasswordReset');
         $this->add('cluster', 'ClusterController@index');
