@@ -353,8 +353,9 @@ class FinanceController extends BaseController {
         if (!$isDeptHead && in_array($transactionType, ['Tithe', 'Welfare'], true) && $memberId) {
             $row = $db->fetch("SELECT phone FROM members WHERE id = ? LIMIT 1", [$memberId]);
             $phone = trim((string)($row['phone'] ?? ''));
-            if ($phone === '') {
-                Session::flash('error', 'This member has no phone number. Add the member phone number first so the payment SMS can be sent.');
+            $hasAnyPhone = $phone !== '' && (bool)preg_match('/(\+233|233|0)\d{9}|\b\d{9}\b/', $phone);
+            if (!$hasAnyPhone) {
+                Session::flash('error', 'This member has no valid phone number. Add a correct phone number first so the payment SMS can be sent.');
                 $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
                 header("Location: $base/finance/add?type=" . urlencode($transactionType));
                 exit;
@@ -454,7 +455,8 @@ class FinanceController extends BaseController {
             }
 
             $deptSmsResult = null;
-            if ((int)($data['department_id'] ?? 0) > 0) {
+            $txTypeLower = strtolower(trim((string)($data['transaction_type'] ?? '')));
+            if ((int)($data['department_id'] ?? 0) > 0 && !in_array($txTypeLower, ['tithe', 'welfare'], true)) {
                 $deptSmsResult = FinanceDepartmentHeadSmsService::sendForTransaction((int)$financeId);
             }
             if ($deptSmsResult && ($deptSmsResult['status'] ?? '') === 'sent') {

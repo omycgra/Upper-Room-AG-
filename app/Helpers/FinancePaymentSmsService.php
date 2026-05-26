@@ -54,6 +54,11 @@ class FinancePaymentSmsService
                 return ['status' => 'skipped', 'message' => 'Transaction recorded, but SMS was not sent because the member phone number is missing.'];
             }
 
+            $phones = self::extractPhoneNumbers($phone);
+            if (empty($phones)) {
+                return ['status' => 'skipped', 'message' => 'Transaction recorded, but SMS was not sent because the member phone number is invalid.'];
+            }
+
             $existingLog = $db->fetch(
                 "SELECT id FROM finance_payment_sms_logs WHERE finance_id = ? LIMIT 1",
                 [$financeId]
@@ -63,8 +68,9 @@ class FinancePaymentSmsService
             }
 
             $message = self::buildMessage($transaction);
-            $result = (new SmsService())->sendBulk([$phone], $message);
-            if (($result['status'] ?? 'error') !== 'success') {
+            $result = (new SmsService())->sendBulk($phones, $message);
+            $sendStatus = (string)($result['status'] ?? 'error');
+            if (!in_array($sendStatus, ['success', 'warning'], true)) {
                 $debugRun = trim((string)($result['debug_run_id'] ?? ''));
                 if ($debugRun !== '') {
                     $result['message'] = trim((string)($result['message'] ?? '')) . ' (Ref: ' . $debugRun . ')';
@@ -83,7 +89,7 @@ class FinancePaymentSmsService
                 [
                     $financeId,
                     $memberId,
-                    $phone,
+                    (string)($phones[0] ?? $phone),
                     $transactionTypeRaw,
                     (float)($transaction['amount'] ?? 0),
                     $provider,
@@ -98,7 +104,8 @@ class FinancePaymentSmsService
                 'transaction_type' => $transactionTypeRaw,
                 'amount' => (float)($transaction['amount'] ?? 0),
                 'provider' => $provider,
-                'debug_run_id' => $debugRun
+                'debug_run_id' => $debugRun,
+                'phones_count' => count($phones)
             ]);
 
             $msg = 'Transaction recorded successfully and SMS sent to the member.';
@@ -110,6 +117,30 @@ class FinancePaymentSmsService
             error_log('FinancePaymentSmsService Failure: ' . $e->getMessage());
             return ['status' => 'error', 'message' => 'Transaction recorded, but SMS failed to send due to a system error.'];
         }
+    }
+
+    private static function extractPhoneNumbers(string $raw): array
+    {
+        $raw = trim($raw);
+        if ($raw === '') return [];
+
+        $found = [];
+        if (preg_match_all('/(\+233|233|0)\d{9}|\b\d{9}\b/', $raw, $m)) {
+            foreach (($m[0] ?? []) as $v) {
+                $v = trim((string)$v);
+                if ($v !== '') $found[] = $v;
+            }
+        }
+        if (empty($found)) {
+            $parts = preg_split('/[,\s\/;|]+/', $raw) ?: [];
+            foreach ($parts as $p) {
+                $p = trim((string)$p);
+                if ($p !== '') $found[] = $p;
+            }
+        }
+
+        $found = array_values(array_unique(array_filter(array_map('trim', $found))));
+        return array_slice($found, 0, 3);
     }
 
     private static function buildMessage(array $transaction): string

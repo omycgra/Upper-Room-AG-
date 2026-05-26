@@ -380,10 +380,7 @@ class AttendanceController extends BaseController {
         }
         $mode = $this->getAttendanceMode();
         if (!in_array($mode, ['qrcode', 'link'], true)) {
-            Session::flash('error', 'Quick attendance is disabled. Change Attendance Mode in Settings.');
-            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
-            header("Location: $base/attendance");
-            exit;
+            $mode = 'link';
         }
         $this->ensureAttendanceSchema();
 
@@ -415,10 +412,7 @@ class AttendanceController extends BaseController {
         }
         $mode = $this->getAttendanceMode();
         if (!in_array($mode, ['qrcode', 'link'], true)) {
-            Session::flash('error', 'Quick attendance is disabled. Change Attendance Mode in Settings.');
-            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
-            header("Location: $base/attendance");
-            exit;
+            $mode = 'link';
         }
         $this->ensureAttendanceSchema();
 

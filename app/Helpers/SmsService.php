@@ -294,7 +294,7 @@ class SmsService {
     }
 
     private function normalizePhone($phone) {
-        $phone = trim((string)$phone);
+        $phone = $this->extractFirstPhoneCandidate($phone);
         if ($phone === '') return '';
         $phone = preg_replace('/[^0-9+]/', '', $phone);
         if (str_starts_with($phone, '+')) {
@@ -316,7 +316,7 @@ class SmsService {
     }
 
     private function normalizePhoneE164($phone) {
-        $phone = trim((string)$phone);
+        $phone = $this->extractFirstPhoneCandidate($phone);
         if ($phone === '') return '';
         $phone = preg_replace('/[^0-9+]/', '', $phone);
         if (str_starts_with($phone, '+')) {
@@ -335,6 +335,22 @@ class SmsService {
             return '+' . $phone;
         }
         return '';
+    }
+
+    private function extractFirstPhoneCandidate($phone): string {
+        $raw = trim((string)$phone);
+        if ($raw === '') return '';
+
+        $raw = preg_replace('/\s+/', ' ', $raw);
+
+        if (preg_match('/(\+233|233|0)\d{9}/', $raw, $m)) {
+            return (string)($m[0] ?? '');
+        }
+        if (preg_match('/\b\d{9}\b/', $raw, $m)) {
+            return (string)($m[0] ?? '');
+        }
+
+        return $raw;
     }
 
     private function getCandidateApiKeys($key) {

@@ -173,6 +173,30 @@
                     <?php endif; ?>
                 </div>
 
+                <?php
+                    $lanIp = '';
+                    $candidates = [];
+                    $serverAddr = trim((string)($_SERVER['SERVER_ADDR'] ?? ''));
+                    if ($serverAddr !== '') $candidates[] = $serverAddr;
+                    $host = @gethostname();
+                    if (is_string($host) && $host !== '') {
+                        $ips = @gethostbynamel($host);
+                        if (is_array($ips)) {
+                            foreach ($ips as $ip) {
+                                $candidates[] = (string)$ip;
+                            }
+                        }
+                    }
+                    $candidates = array_values(array_unique(array_filter(array_map('trim', $candidates))));
+                    foreach ($candidates as $ip) {
+                        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) continue;
+                        if (str_starts_with($ip, '127.')) continue;
+                        if ($ip === '0.0.0.0') continue;
+                        $lanIp = $ip;
+                        break;
+                    }
+                ?>
+
                 <script>
                     (function () {
                         const dateEl = document.getElementById('quick-service-date');
@@ -189,7 +213,14 @@
                             const t = typeEl.value || 'Sunday Service';
                             const qs = new URLSearchParams({ service_date: d, service_type: t }).toString();
                             const base = '<?php echo rtrim((string)BASE_URL, '/'); ?>';
-                            const baseAbs = (base.startsWith('http://') || base.startsWith('https://')) ? base : (window.location.origin + base);
+                            let origin = window.location.origin;
+                            try {
+                                const host = (window.location.hostname || '').toLowerCase();
+                                if ((host === 'localhost' || host === '127.0.0.1') && '<?php echo $lanIp; ?>' !== '') {
+                                    origin = window.location.protocol + '//' + '<?php echo $lanIp; ?>' + (window.location.port ? (':' + window.location.port) : '');
+                                }
+                            } catch (e) {}
+                            const baseAbs = (base.startsWith('http://') || base.startsWith('https://')) ? base : (origin + base);
                             return baseAbs + '/attendance/quick?' + qs;
                         };
 
