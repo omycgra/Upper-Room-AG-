@@ -168,7 +168,7 @@ class SettingController extends BaseController {
 
         if ($role === 'visitation_team') {
             if ($departmentId === null) {
-                Session::flash('error', 'Visitation team users must be assigned to the Visitation department.');
+                Session::flash('error', 'Visitation member users must be assigned to the Visitation department.');
                 header('Location: ' . BASE_URL . '/settings');
                 exit;
             }
@@ -176,7 +176,7 @@ class SettingController extends BaseController {
             $department = $db->fetch("SELECT name FROM departments WHERE id = ? LIMIT 1", [$departmentId]);
             $departmentName = strtolower(trim((string)($department['name'] ?? '')));
             if ($departmentName === '' || strpos($departmentName, 'visitation') === false) {
-                Session::flash('error', 'Please assign visitation team users to the Visitation department only.');
+                Session::flash('error', 'Please assign visitation member users to the Visitation department only.');
                 header('Location: ' . BASE_URL . '/settings');
                 exit;
             }

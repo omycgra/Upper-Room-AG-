@@ -22,6 +22,34 @@ class Branding
             }
         }
 
+        $localCandidate = $p;
+        if (defined('ROOT_PATH') && $localCandidate !== '') {
+            $full = ROOT_PATH . '/' . $localCandidate;
+            if (file_exists($full)) {
+                return rtrim((string)BASE_URL, '/') . '/' . $localCandidate;
+            }
+        }
+
+        $supabaseUrl = trim((string)Env::get('SUPABASE_URL', ''));
+        $bucket = trim((string)Env::get('SUPABASE_STORAGE_BUCKET', ''));
+        if ($bucket === '') $bucket = 'uploads';
+        if ($supabaseUrl !== '') {
+            if (strpos($p, 'public/uploads/') === 0) {
+                $objectPath = substr($p, strlen('public/uploads/'));
+                if ($objectPath !== '') {
+                    $encodedPath = implode('/', array_map('rawurlencode', array_filter(explode('/', $objectPath), 'strlen')));
+                    return rtrim($supabaseUrl, '/') . '/storage/v1/object/public/' . rawurlencode($bucket) . '/' . $encodedPath;
+                }
+            }
+            if (strpos($p, 'uploads/') === 0) {
+                $objectPath = substr($p, strlen('uploads/'));
+                if ($objectPath !== '') {
+                    $encodedPath = implode('/', array_map('rawurlencode', array_filter(explode('/', $objectPath), 'strlen')));
+                    return rtrim($supabaseUrl, '/') . '/storage/v1/object/public/' . rawurlencode($bucket) . '/' . $encodedPath;
+                }
+            }
+        }
+
         return rtrim((string)BASE_URL, '/') . '/' . $p;
     }
 

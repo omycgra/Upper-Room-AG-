@@ -250,7 +250,7 @@
         <form action="<?php echo BASE_URL; ?>/visitors/assign" method="POST" data-loader="top" class="space-y-8">
             <input type="hidden" name="visitor_id" id="assign-visitor-id" value="">
             <div class="space-y-3">
-                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Visitation Team Member</label>
+                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Visitation Member</label>
                 <div class="relative">
                     <i class="fas fa-user-check absolute left-5 top-1/2 -translate-y-1/2 text-slate-600"></i>
                     <select id="assign-visitor-select" name="assigned_to" required class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-4 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">

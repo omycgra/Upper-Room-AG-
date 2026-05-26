@@ -1197,7 +1197,7 @@
                                                     <option value="finance_staff">Finance Staff</option>
                                                     <option value="auditor">Auditor</option>
                                                     <option value="dept_head">Department Head</option>
-                                                    <option value="visitation_team">Visitation Team</option>
+                                                    <option value="visitation_team">Visitation Member</option>
                                                     <option value="pastor">Pastor</option>
                                                 </select>
                                                 <div class="absolute inset-y-0 right-0 pr-5 flex items-center pointer-events-none">

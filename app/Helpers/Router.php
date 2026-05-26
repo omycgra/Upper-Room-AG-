@@ -37,6 +37,7 @@ class Router {
         $this->add('attendance', 'AttendanceController@index');
         $this->add('attendance/mark', 'AttendanceController@mark');
         $this->add('attendance/store', 'AttendanceController@store');
+        $this->add('attendance/syncBioTime', 'AttendanceController@syncBioTime');
         $this->add('finance', 'FinanceController@index');
         $this->add('finance/add', 'FinanceController@add');
         $this->add('finance/store', 'FinanceController@store');
@@ -52,6 +53,8 @@ class Router {
         $this->add('finance/requestDepartmentExpense', 'FinanceController@requestDepartmentExpense');
         $this->add('finance/approveDepartmentExpenseRequest', 'FinanceController@approveDepartmentExpenseRequest');
         $this->add('finance/rejectDepartmentExpenseRequest', 'FinanceController@rejectDepartmentExpenseRequest');
+        $this->add('transactions', 'FinanceController@transactions');
+        $this->add('department-savings', 'FinanceController@departmentSavings');
         $this->add('sms', 'SmsController@index');
         $this->add('sms/balance', 'SmsController@balance');
         $this->add('sms/send', 'SmsController@send');

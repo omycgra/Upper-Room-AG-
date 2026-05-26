@@ -323,7 +323,7 @@ class MemberController extends BaseController {
             "NATIONALITY", "PHONE NUMBER", "ADDRESS", "HOME TOWN", "MARITAL STATUS",
             "NAME OF SPOUSE", "MOTHER NAME", "FATHER NAME", "HAVE YOU BEEN BAPTIZED",
             "PASTOR WHO BAPTIZED YOU AND CHURCH", "ARE YOU WORKING", "NAME OF WORK",
-            "GROUP", "DEPARTMENT"
+            "GROUP", "DEPARTMENT", "INITIAL STATUS"
         ];
 
         header('Content-Type: text/csv');
@@ -337,7 +337,7 @@ class MemberController extends BaseController {
             "BIO-001", "CHRISTOPHER", "AGYEI", "MALE", "1990-01-01",
             "GHANAIAN", "0240000000", "MAMPONG ESTATE", "KUMASI", "MARRIED",
             "ABENA AGYEI", "GRACE AGYEI", "MICHAEL AGYEI", "YES",
-            "PASTOR MENSAH - UPPER ROOM", "YES", "TEACHER", "YOUTH", "VISITATION"
+            "PASTOR MENSAH - UPPER ROOM", "YES", "TEACHER", "YOUTH", "VISITATION", "Active"
         ]);
         
         fclose($output);
@@ -355,46 +355,86 @@ class MemberController extends BaseController {
             exit;
         }
 
-        $file = $_FILES['excel_file']['tmp_name'];
-        $handle = fopen($file, "r");
-        
-        // Skip header row
-        $header = fgetcsv($handle);
+        $file = (string)($_FILES['excel_file']['tmp_name'] ?? '');
+        $originalName = (string)($_FILES['excel_file']['name'] ?? '');
+        $result = null;
+        try {
+            $result = $this->readMemberImportRows($file, $originalName);
+        } catch (Throwable $e) {
+            Session::flash('error', $e->getMessage() ?: 'Failed to read import file.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/members");
+            exit;
+        }
+
+        $header = (array)($result['header'] ?? []);
+        $rows = (array)($result['rows'] ?? []);
+        $headerIndex = $this->buildImportHeaderIndex($header);
         
         $memberModel = new Member();
         $count = 0;
         $skipped = 0;
         $errors = [];
 
-        while (($data = fgetcsv($handle)) !== FALSE) {
-            if (empty($data[1]) || empty($data[2])) continue; // Skip empty rows or missing names
+        foreach ($rows as $data) {
+            if (!is_array($data)) {
+                continue;
+            }
 
+            $rowLabel = trim((string)($this->getImportValue($data, $headerIndex, 'FIRST NAME', 1) ?? '') . ' ' . (string)($this->getImportValue($data, $headerIndex, 'LAST NAME', 2) ?? ''));
             try {
+                $bioRaw = $this->getImportValue($data, $headerIndex, 'BIO ID', 0);
+                $firstNameRaw = $this->getImportValue($data, $headerIndex, 'FIRST NAME', 1);
+                $lastNameRaw = $this->getImportValue($data, $headerIndex, 'LAST NAME', 2);
+                if (trim((string)$firstNameRaw) === '' || trim((string)$lastNameRaw) === '') {
+                    continue;
+                }
+                $genderRaw = $this->getImportValue($data, $headerIndex, 'GENDER', 3);
+                $dobRaw = $this->getImportValue($data, $headerIndex, 'DATE OF BIRTH', 4);
+                $nationalityRaw = $this->getImportValue($data, $headerIndex, 'NATIONALITY', 5);
+                $phoneRaw = $this->getImportValue($data, $headerIndex, 'PHONE NUMBER', 6);
+                $addressRaw = $this->getImportValue($data, $headerIndex, 'ADDRESS', 7);
+                $homeTownRaw = $this->getImportValue($data, $headerIndex, 'HOME TOWN', 8);
+                $maritalRaw = $this->getImportValue($data, $headerIndex, 'MARITAL STATUS', 9);
+                $spouseRaw = $this->getImportValue($data, $headerIndex, 'NAME OF SPOUSE', 10);
+                $motherRaw = $this->getImportValue($data, $headerIndex, 'MOTHER NAME', 11);
+                $fatherRaw = $this->getImportValue($data, $headerIndex, 'FATHER NAME', 12);
+                $baptizedRaw = $this->getImportValue($data, $headerIndex, 'HAVE YOU BEEN BAPTIZED', 13);
+                $baptismPastorRaw = $this->getImportValue($data, $headerIndex, 'PASTOR WHO BAPTIZED YOU AND CHURCH', 14);
+                $workingRaw = $this->getImportValue($data, $headerIndex, 'ARE YOU WORKING', 15);
+                $workNameRaw = $this->getImportValue($data, $headerIndex, 'NAME OF WORK', 16);
+                $groupRaw = $this->getImportValue($data, $headerIndex, 'GROUP', 17);
+                $departmentRaw = $this->getImportValue($data, $headerIndex, 'DEPARTMENT', 18);
+                $statusRaw = $this->getImportValue($data, $headerIndex, 'INITIAL STATUS', 19);
+                if ($statusRaw === null) {
+                    $statusRaw = $this->getImportValue($data, $headerIndex, 'MEMBERSHIP STATUS', 19);
+                }
+
                 $memberData = [
                     'member_code' => $this->generateUniqueMemberCode(),
-                    'bio_id' => $this->resolveBioId($this->uppercaseImportedValue($data[0] ?? '')),
-                    'first_name' => $this->uppercaseImportedValue($data[1] ?? ''),
-                    'last_name' => $this->uppercaseImportedValue($data[2] ?? ''),
-                    'gender' => $this->normalizeImportedOption($data[3] ?? 'male', 'male'),
-                    'date_of_birth' => !empty($data[4]) ? $data[4] : null,
-                    'nationality' => $this->uppercaseImportedValue($data[5] ?? null),
-                    'phone' => $this->uppercaseImportedValue($data[6] ?? null),
-                    'address' => $this->uppercaseImportedValue($data[7] ?? null),
-                    'home_town' => $this->uppercaseImportedValue($data[8] ?? null),
-                    'marital_status' => $this->normalizeImportedOption($data[9] ?? 'single', 'single'),
-                    'spouse_name' => $this->uppercaseImportedValue($data[10] ?? null),
-                    'mother_name' => $this->uppercaseImportedValue($data[11] ?? null),
-                    'father_name' => $this->uppercaseImportedValue($data[12] ?? null),
-                    'is_baptized' => $this->toBooleanValue($data[13] ?? false),
-                    'baptism_pastor_church' => $this->uppercaseImportedValue($data[14] ?? null),
-                    'currently_working' => $this->toBooleanValue($data[15] ?? false),
-                    'work_name' => $this->uppercaseImportedValue($data[16] ?? null),
-                    'cluster_id' => $this->resolveClusterIdByName($data[17] ?? null),
-                    'membership_status' => 'ACTIVE',
+                    'bio_id' => $this->resolveBioId($this->uppercaseImportedValue($bioRaw)),
+                    'first_name' => $this->uppercaseImportedValue($firstNameRaw ?? ''),
+                    'last_name' => $this->uppercaseImportedValue($lastNameRaw ?? ''),
+                    'gender' => $this->normalizeImportedOption($genderRaw ?? 'male', 'male'),
+                    'date_of_birth' => !empty($dobRaw) ? trim((string)$dobRaw) : null,
+                    'nationality' => $this->uppercaseImportedValue($nationalityRaw),
+                    'phone' => $this->uppercaseImportedValue($phoneRaw),
+                    'address' => $this->uppercaseImportedValue($addressRaw),
+                    'home_town' => $this->uppercaseImportedValue($homeTownRaw),
+                    'marital_status' => $this->normalizeImportedOption($maritalRaw ?? 'single', 'single'),
+                    'spouse_name' => $this->uppercaseImportedValue($spouseRaw),
+                    'mother_name' => $this->uppercaseImportedValue($motherRaw),
+                    'father_name' => $this->uppercaseImportedValue($fatherRaw),
+                    'is_baptized' => $this->toBooleanValue($baptizedRaw ?? false),
+                    'baptism_pastor_church' => $this->uppercaseImportedValue($baptismPastorRaw),
+                    'currently_working' => $this->toBooleanValue($workingRaw ?? false),
+                    'work_name' => $this->uppercaseImportedValue($workNameRaw),
+                    'cluster_id' => $this->resolveClusterIdByName($groupRaw),
+                    'membership_status' => $this->normalizeMembershipStatus($statusRaw),
                     'join_date' => date('Y-m-d')
                 ];
 
-                $departmentAssignment = $this->resolveDepartmentAssignmentsByName($data[18] ?? null);
+                $departmentAssignment = $this->resolveDepartmentAssignmentsByName($departmentRaw);
                 $memberData['department_id'] = $departmentAssignment['primary_department_id'];
 
                 $existing = $this->findExistingMember($memberModel, $memberData);
@@ -414,11 +454,9 @@ class MemberController extends BaseController {
                 if ($conn->inTransaction()) {
                     $conn->rollBack();
                 }
-                $errors[] = "Error importing row for " . trim(($data[1] ?? '') . ' ' . ($data[2] ?? 'Unknown')) . ": " . $e->getMessage();
+                $errors[] = "Error importing row for " . ($rowLabel !== '' ? $rowLabel : 'Unknown') . ": " . $e->getMessage();
             }
         }
-
-        fclose($handle);
 
         if ($count > 0) {
             AuditLog::log("Imported $count members via Excel", "members");
@@ -564,6 +602,8 @@ class MemberController extends BaseController {
                 'currently_working' => "ALTER TABLE members ADD COLUMN currently_working BOOLEAN NOT NULL DEFAULT FALSE",
                 'work_name' => "ALTER TABLE members ADD COLUMN work_name VARCHAR(150) NULL",
                 'photo_path' => "ALTER TABLE members ADD COLUMN photo_path VARCHAR(255) NULL",
+                'membership_status' => "ALTER TABLE members ADD COLUMN membership_status VARCHAR(30) NULL DEFAULT 'Active'",
+                'join_date' => "ALTER TABLE members ADD COLUMN join_date DATE NULL",
             ];
 
             foreach ($columns as $columnName => $sql) {
@@ -600,6 +640,246 @@ class MemberController extends BaseController {
                 }
             }
         });
+    }
+
+    private function normalizeMembershipStatus($value): string
+    {
+        $v = strtolower(trim((string)$value));
+        if ($v === '') {
+            return 'Active';
+        }
+
+        if (in_array($v, ['active', 'act', 'a', 'yes', 'y', '1', 'true'], true)) {
+            return 'Active';
+        }
+
+        if (in_array($v, ['inactive', 'in active', 'deactive', 'deactivated', 'disabled', 'no', 'n', '0', 'false'], true)) {
+            return 'Inactive';
+        }
+
+        return 'Active';
+    }
+
+    private function buildImportHeaderIndex(array $header): array
+    {
+        $map = [];
+        foreach ($header as $i => $h) {
+            $key = $this->normalizeImportHeaderKey($h);
+            if ($key === '') {
+                continue;
+            }
+            if (!array_key_exists($key, $map)) {
+                $map[$key] = (int)$i;
+            }
+        }
+        return $map;
+    }
+
+    private function normalizeImportHeaderKey($value): string
+    {
+        $v = strtoupper(trim((string)$value));
+        if ($v === '') {
+            return '';
+        }
+        $v = preg_replace('/\s+/', ' ', $v);
+        return trim((string)$v);
+    }
+
+    private function getImportValue(array $row, array $headerIndex, string $headerName, int $fallbackIndex)
+    {
+        $k = $this->normalizeImportHeaderKey($headerName);
+        if ($k !== '' && array_key_exists($k, $headerIndex)) {
+            $idx = (int)$headerIndex[$k];
+            return $row[$idx] ?? null;
+        }
+        return $row[$fallbackIndex] ?? null;
+    }
+
+    private function readMemberImportRows(string $tmpPath, string $originalName): array
+    {
+        $tmpPath = trim($tmpPath);
+        if ($tmpPath === '' || !file_exists($tmpPath)) {
+            throw new Exception('Import file not found.');
+        }
+
+        $name = strtolower(trim($originalName));
+        $ext = '';
+        if (($pos = strrpos($name, '.')) !== false) {
+            $ext = substr($name, $pos + 1);
+        }
+
+        if ($ext === 'xlsx') {
+            return $this->readXlsxRows($tmpPath);
+        }
+
+        $fh = @fopen($tmpPath, 'rb');
+        if ($fh) {
+            $sig = fread($fh, 2);
+            fclose($fh);
+            if ($sig === "PK") {
+                return $this->readXlsxRows($tmpPath);
+            }
+        }
+
+        return $this->readCsvRows($tmpPath);
+    }
+
+    private function readCsvRows(string $path): array
+    {
+        $handle = fopen($path, 'r');
+        if (!$handle) {
+            throw new Exception('Failed to open CSV file.');
+        }
+
+        $header = fgetcsv($handle);
+        if (!is_array($header) || empty($header)) {
+            fclose($handle);
+            throw new Exception('CSV header row is missing.');
+        }
+
+        $rows = [];
+        while (($row = fgetcsv($handle)) !== false) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $rows[] = $row;
+        }
+        fclose($handle);
+
+        return ['header' => $header, 'rows' => $rows];
+    }
+
+    private function readXlsxRows(string $path): array
+    {
+        if (!class_exists('ZipArchive')) {
+            throw new Exception('XLSX import is not available on this server. Please upload CSV instead.');
+        }
+
+        $zip = new ZipArchive();
+        $ok = $zip->open($path);
+        if ($ok !== true) {
+            throw new Exception('Failed to open XLSX file.');
+        }
+
+        $sharedStrings = [];
+        $sharedXml = $zip->getFromName('xl/sharedStrings.xml');
+        if (is_string($sharedXml) && trim($sharedXml) !== '') {
+            $sx = @simplexml_load_string($sharedXml);
+            if ($sx) {
+                foreach ($sx->si as $si) {
+                    $text = '';
+                    if (isset($si->t)) {
+                        $text = (string)$si->t;
+                    } elseif (isset($si->r)) {
+                        foreach ($si->r as $r) {
+                            $text .= (string)($r->t ?? '');
+                        }
+                    }
+                    $sharedStrings[] = $text;
+                }
+            }
+        }
+
+        $sheetPath = 'xl/worksheets/sheet1.xml';
+        $workbookXml = $zip->getFromName('xl/workbook.xml');
+        $relsXml = $zip->getFromName('xl/_rels/workbook.xml.rels');
+        if (is_string($workbookXml) && is_string($relsXml)) {
+            $wb = @simplexml_load_string($workbookXml);
+            $rels = @simplexml_load_string($relsXml);
+            if ($wb && $rels) {
+                $wb->registerXPathNamespace('ns', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+                $sheets = $wb->xpath('//ns:sheets/ns:sheet');
+                if (is_array($sheets) && isset($sheets[0])) {
+                    $sheet = $sheets[0];
+                    $ridAttr = $sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+                    $rid = (string)($ridAttr['id'] ?? '');
+                    if ($rid !== '') {
+                        $rels->registerXPathNamespace('r', 'http://schemas.openxmlformats.org/package/2006/relationships');
+                        $relsNodes = $rels->xpath("//r:Relationship[@Id='{$rid}']");
+                        if (is_array($relsNodes) && isset($relsNodes[0])) {
+                            $target = (string)($relsNodes[0]['Target'] ?? '');
+                            $target = ltrim($target, '/');
+                            if ($target !== '') {
+                                $sheetPath = 'xl/' . $target;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $sheetXml = $zip->getFromName($sheetPath);
+        $zip->close();
+        if (!is_string($sheetXml) || trim($sheetXml) === '') {
+            throw new Exception('XLSX sheet data not found.');
+        }
+
+        $sx = @simplexml_load_string($sheetXml);
+        if (!$sx) {
+            throw new Exception('Failed to parse XLSX sheet.');
+        }
+        $sx->registerXPathNamespace('ns', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+        $rowsXml = $sx->xpath('//ns:sheetData/ns:row');
+        if (!is_array($rowsXml) || empty($rowsXml)) {
+            throw new Exception('XLSX has no rows.');
+        }
+
+        $rows = [];
+        $maxCols = 0;
+        foreach ($rowsXml as $rowNode) {
+            $cells = [];
+            foreach ($rowNode->c as $c) {
+                $r = (string)($c['r'] ?? '');
+                $colIndex = $this->xlsxColIndexFromRef($r);
+                if ($colIndex < 0) {
+                    continue;
+                }
+                $t = (string)($c['t'] ?? '');
+                $v = isset($c->v) ? (string)$c->v : '';
+                $value = $v;
+                if ($t === 's') {
+                    $si = (int)$v;
+                    $value = $sharedStrings[$si] ?? '';
+                } elseif ($t === 'inlineStr') {
+                    $value = (string)($c->is->t ?? '');
+                }
+                $cells[$colIndex] = $value;
+                if ($colIndex + 1 > $maxCols) {
+                    $maxCols = $colIndex + 1;
+                }
+            }
+            $row = [];
+            for ($i = 0; $i < $maxCols; $i++) {
+                $row[$i] = $cells[$i] ?? null;
+            }
+            $rows[] = $row;
+        }
+
+        if (count($rows) < 2) {
+            throw new Exception('XLSX has no data rows.');
+        }
+
+        $header = $rows[0];
+        $dataRows = array_slice($rows, 1);
+        return ['header' => $header, 'rows' => $dataRows];
+    }
+
+    private function xlsxColIndexFromRef(string $ref): int
+    {
+        if ($ref === '') {
+            return -1;
+        }
+        $ref = strtoupper($ref);
+        $letters = preg_replace('/[^A-Z]/', '', $ref);
+        if ($letters === '') {
+            return -1;
+        }
+        $n = 0;
+        $len = strlen($letters);
+        for ($i = 0; $i < $len; $i++) {
+            $n = $n * 26 + (ord($letters[$i]) - 64);
+        }
+        return $n - 1;
     }
 
     private function toBooleanValue($value) {

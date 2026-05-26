@@ -4,7 +4,7 @@ require_once __DIR__ . '/SmsService.php';
 
 class FinancePaymentSmsService
 {
-    private const ELIGIBLE_TYPES = ['Tithe', 'Welfare'];
+    private const ELIGIBLE_TYPES = ['tithe', 'welfare'];
 
     public static function sendForTransaction(int $financeId): array
     {
@@ -42,7 +42,8 @@ class FinancePaymentSmsService
                 return ['status' => 'skipped', 'message' => 'SMS skipped because the transaction was not found.'];
             }
 
-            $transactionType = trim((string)($transaction['transaction_type'] ?? ''));
+            $transactionTypeRaw = trim((string)($transaction['transaction_type'] ?? ''));
+            $transactionType = strtolower($transactionTypeRaw);
             if (!in_array($transactionType, self::ELIGIBLE_TYPES, true)) {
                 return ['status' => 'skipped', 'message' => 'SMS skipped because this transaction type is not configured for automatic member alerts.'];
             }
@@ -78,7 +79,7 @@ class FinancePaymentSmsService
                     $financeId,
                     $memberId,
                     $phone,
-                    $transactionType,
+                    $transactionTypeRaw,
                     (float)($transaction['amount'] ?? 0),
                     $provider,
                     $message,
@@ -89,7 +90,7 @@ class FinancePaymentSmsService
             AuditLog::log('Automatic finance payment SMS sent', 'finance_payment_sms_logs', $financeId, null, [
                 'finance_id' => $financeId,
                 'member_id' => $memberId,
-                'transaction_type' => $transactionType,
+                'transaction_type' => $transactionTypeRaw,
                 'amount' => (float)($transaction['amount'] ?? 0),
                 'provider' => $provider
             ]);

@@ -190,7 +190,7 @@
                             <i class="fas fa-user-check absolute left-5 top-1/2 -translate-y-1/2 text-slate-600"></i>
                             <select name="assigned_to" class="w-full bg-white/5 border border-white/10 rounded-2xl pl-14 pr-10 py-4 text-sm font-bold text-white appearance-none outline-none focus:border-accent transition-all" <?php echo empty($followupUsers) ? 'disabled' : 'required'; ?>>
                                 <?php if (empty($followupUsers)): ?>
-                                    <option value="">Create a Visitation Team user first</option>
+                                    <option value="">Create a Visitation Member user first</option>
                                 <?php else: ?>
                                     <option value="">Select visitation assignee</option>
                                     <?php foreach (($followupUsers ?? []) as $user): ?>
@@ -202,7 +202,7 @@
                             </select>
                             <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
                         </div>
-                        <p class="text-[11px] text-slate-500 font-bold">Only users created as `Visitation Team` inside the `Visitation` department can be assigned.</p>
+                        <p class="text-[11px] text-slate-500 font-bold">Only users created as a Visitation Member inside the Visitation department can be assigned.</p>
                     </div>
 
                     <div class="md:col-span-2 space-y-3">

@@ -174,8 +174,111 @@ class FinanceController extends BaseController {
         ]);
     }
 
+    public function transactions() {
+        $this->ensureFinanceSchema();
+        $financeModel = new Finance();
+
+        $isDeptHead = Auth::isDepartmentHead();
+        $isStaff = Auth::isStaff();
+        $myDeptId = $isDeptHead ? (int)(Session::get('user_department_id') ?? 0) : 0;
+        if ($isDeptHead && $myDeptId <= 0) {
+            Session::flash('error', 'Department access is not configured for this account.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/dashboard");
+            exit;
+        }
+
+        $staffAllowedTypes = $this->getStaffAllowedTypes();
+        $recentTransactions = [];
+        $activeChangeRequestMap = [];
+        $approvedChangeRequestMap = [];
+
+        if ($isStaff) {
+            if (Auth::isFinanceHead()) {
+                $recentTransactions = $financeModel->getRecentTransactionsWithMeta(200);
+            } else {
+                $recentTransactions = $financeModel->getRecentTransactionsByRecorderWithMeta((int)Session::get('user_id'), 200, $staffAllowedTypes);
+            }
+
+            $myChangeRequests = $financeModel->getChangeRequestsForRequester((int)Session::get('user_id'), 200);
+            foreach ($myChangeRequests as $r) {
+                $status = strtolower(trim((string)($r['status'] ?? '')));
+                $fulfilledAt = $r['fulfilled_at'] ?? null;
+                if ($fulfilledAt === null && in_array($status, ['pending', 'approved'], true)) {
+                    $activeChangeRequestMap[(int)($r['finance_id'] ?? 0)] = $r;
+                }
+            }
+            $approvedChangeRequestMap = $financeModel->getApprovedChangeRequestsForRequester((int)Session::get('user_id'));
+        } else {
+            $recentTransactions = $isDeptHead
+                ? $financeModel->getRecentDepartmentTransactionsWithMeta($myDeptId, 200, null)
+                : $financeModel->getRecentTransactionsWithMeta(200);
+        }
+
+        $db = Database::getInstance();
+        $bank = [
+            'currency' => $this->getSetting($db, 'finance_currency', 'GHS')
+        ];
+
+        View::render('finance.transactions', [
+            'title' => 'Transactions',
+            'bank' => $bank,
+            'recent_transactions' => $recentTransactions,
+            'isDeptHead' => $isDeptHead,
+            'isStaff' => $isStaff,
+            'active_change_request_map' => $activeChangeRequestMap,
+            'approved_change_request_map' => $approvedChangeRequestMap,
+            'receipt_data' => Session::flash('receipt_data'),
+        ]);
+    }
+
+    public function departmentSavings() {
+        $this->ensureFinanceSchema();
+        $financeModel = new Finance();
+
+        $isDeptHead = Auth::isDepartmentHead();
+        $isStaff = Auth::isStaff();
+        $myDeptId = $isDeptHead ? (int)(Session::get('user_department_id') ?? 0) : 0;
+        if ($isDeptHead && $myDeptId <= 0) {
+            Session::flash('error', 'Department access is not configured for this account.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/dashboard");
+            exit;
+        }
+
+        $month = (int)($_GET['month'] ?? date('m'));
+        $year = (int)($_GET['year'] ?? date('Y'));
+        if ($month < 1 || $month > 12) $month = (int)date('m');
+        if ($year < 2000 || $year > ((int)date('Y') + 1)) $year = (int)date('Y');
+
+        $departmentSavings = $financeModel->getDepartmentSavingsSummary($month, $year, $isDeptHead ? $myDeptId : null, null);
+
+        $db = Database::getInstance();
+        $bank = [
+            'currency' => $this->getSetting($db, 'finance_currency', 'GHS')
+        ];
+
+        View::render('finance.department_savings', [
+            'title' => 'Departmental Savings',
+            'bank' => $bank,
+            'month' => $month,
+            'year' => $year,
+            'month_label' => date('F Y', strtotime(sprintf('%04d-%02d-01', $year, $month))),
+            'department_savings' => $departmentSavings,
+            'isDeptHead' => $isDeptHead,
+            'isStaff' => $isStaff,
+            'myDeptId' => $myDeptId,
+        ]);
+    }
+
     public function add() {
         $this->ensureFinanceSchema();
+        if (Auth::isAdmin()) {
+            Session::flash('error', 'Admins can view transactions but cannot add them.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/transactions");
+            exit;
+        }
         $isDeptHead = Auth::isDepartmentHead();
         $isStaff = Auth::isStaff();
         $myDeptId = $isDeptHead ? (int)(Session::get('user_department_id') ?? 0) : 0;
@@ -207,6 +310,12 @@ class FinanceController extends BaseController {
     public function store() {
         $this->ensureFinanceSchema();
         $financeModel = new Finance();
+        if (Auth::isAdmin()) {
+            Session::flash('error', 'Admins can view transactions but cannot add them.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/transactions");
+            exit;
+        }
 
         $isDeptHead = Auth::isDepartmentHead();
         $isStaff = Auth::isStaff();
@@ -231,6 +340,13 @@ class FinanceController extends BaseController {
             Session::flash('error', 'Staff can record only general offering, tithe, department offering, welfare, and church expenses.');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/finance/add");
+            exit;
+        }
+
+        if (!$isDeptHead && in_array($transactionType, ['Tithe', 'Welfare'], true) && !$memberId) {
+            Session::flash('error', $transactionType . ' must be attached to a member (so we can send the payment SMS).');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/finance/add?type=" . urlencode($transactionType));
             exit;
         }
 
@@ -342,7 +458,7 @@ class FinanceController extends BaseController {
                 }
             }
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
-            header("Location: $base/finance");
+            header("Location: $base/transactions");
         } else {
             Session::flash('error', 'Failed to record transaction');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
@@ -937,9 +1053,10 @@ class FinanceController extends BaseController {
         $db = Database::getInstance();
         try {
             $request = $db->fetch(
-                "SELECT r.*, d.name as department_name
+                "SELECT r.*, d.name as department_name, u.name, u.phone
                  FROM department_expense_requests r
                  INNER JOIN departments d ON d.id = r.department_id
+                 LEFT JOIN users u ON u.id = r.requested_by
                  WHERE r.id = ?
                  LIMIT 1",
                 [$requestId]
@@ -1012,6 +1129,23 @@ class FinanceController extends BaseController {
                 'finance_id' => $financeId
             ]);
 
+            $reqPhone = trim((string)($request['phone'] ?? ''));
+            if ($reqPhone !== '') {
+                $currency = strtoupper(trim((string)AppConfig::getSetting('finance_currency', 'GHS')));
+                if (!preg_match('/^[A-Z]{2,5}$/', $currency)) $currency = 'GHS';
+                $toName = trim((string)($request['name'] ?? ''));
+                $toName = $toName !== '' ? $toName : 'Department Head';
+                $deptName = trim((string)($request['department_name'] ?? 'Department'));
+                $purpose = trim((string)($request['purpose'] ?? ''));
+                $approvedByName = trim((string)Session::get('user_name', 'Finance Head'));
+                $msg = 'Dear ' . $toName . ', your expense request for ' . $deptName . ' of ' . $currency . ' ' . number_format($amount, 2) . ' has been APPROVED by ' . $approvedByName . '.';
+                if ($purpose !== '') {
+                    $msg .= ' Purpose: ' . $purpose . '.';
+                }
+                $msg .= ' Ref: DEP-REQ-' . $requestId . '.';
+                (new SmsService())->sendBulk([$reqPhone], $msg);
+            }
+
             if ($this->wantsJsonResponse()) {
                 $this->jsonResponse(['success' => true, 'message' => 'Expense request approved.']);
             }
@@ -1050,7 +1184,15 @@ class FinanceController extends BaseController {
 
         $db = Database::getInstance();
         try {
-            $request = $db->fetch("SELECT * FROM department_expense_requests WHERE id = ? LIMIT 1", [$requestId]);
+            $request = $db->fetch(
+                "SELECT r.*, d.name as department_name, u.name, u.phone
+                 FROM department_expense_requests r
+                 INNER JOIN departments d ON d.id = r.department_id
+                 LEFT JOIN users u ON u.id = r.requested_by
+                 WHERE r.id = ?
+                 LIMIT 1",
+                [$requestId]
+            );
             if (!$request) {
                 if ($this->wantsJsonResponse()) {
                     $this->jsonResponse(['success' => false, 'message' => 'Expense request not found.'], 404);
@@ -1079,6 +1221,24 @@ class FinanceController extends BaseController {
             );
 
             AuditLog::log('Rejected department expense request', 'department_expense_requests', $requestId);
+
+            $reqPhone = trim((string)($request['phone'] ?? ''));
+            if ($reqPhone !== '') {
+                $amount = (float)($request['amount'] ?? 0);
+                $currency = strtoupper(trim((string)AppConfig::getSetting('finance_currency', 'GHS')));
+                if (!preg_match('/^[A-Z]{2,5}$/', $currency)) $currency = 'GHS';
+                $toName = trim((string)($request['name'] ?? ''));
+                $toName = $toName !== '' ? $toName : 'Department Head';
+                $deptName = trim((string)($request['department_name'] ?? 'Department'));
+                $purpose = trim((string)($request['purpose'] ?? ''));
+                $rejectedByName = trim((string)Session::get('user_name', 'Finance Head'));
+                $msg = 'Dear ' . $toName . ', your expense request for ' . $deptName . ' of ' . $currency . ' ' . number_format($amount, 2) . ' has been REJECTED by ' . $rejectedByName . '.';
+                if ($purpose !== '') {
+                    $msg .= ' Purpose: ' . $purpose . '.';
+                }
+                $msg .= ' Ref: DEP-REQ-' . $requestId . '.';
+                (new SmsService())->sendBulk([$reqPhone], $msg);
+            }
             if ($this->wantsJsonResponse()) {
                 $this->jsonResponse(['success' => true, 'message' => 'Expense request rejected.']);
             }

@@ -62,13 +62,13 @@ class VisitorController extends BaseController {
 
         $assignedTo = !empty($_POST['assigned_to']) ? (int)$_POST['assigned_to'] : null;
         if ($assignedTo === null) {
-            Session::flash('error', 'Please assign this visitor to a visitation team member.');
+            Session::flash('error', 'Please assign this visitor to a visitation member.');
             header('Location: ' . BASE_URL . '/visitors/add');
             exit;
         }
 
         if (!in_array($assignedTo, $allowedAssigneeIds, true)) {
-            Session::flash('error', 'Visitor assignment must be to a visitation team member only.');
+            Session::flash('error', 'Visitor assignment must be to a visitation member only.');
             header('Location: ' . BASE_URL . '/visitors/add');
             exit;
         }
@@ -284,7 +284,7 @@ class VisitorController extends BaseController {
         $assignees = $this->getFollowupUsers();
         $allowedAssigneeIds = array_map('intval', array_column($assignees, 'id'));
         if (!in_array($assignedTo, $allowedAssigneeIds, true)) {
-            Session::flash('error', 'Visitor assignment must be to a visitation team member only.');
+            Session::flash('error', 'Visitor assignment must be to a visitation member only.');
             header('Location: ' . BASE_URL . '/visitors');
             exit;
         }
@@ -305,7 +305,7 @@ class VisitorController extends BaseController {
                  WHERE id = ?",
                 [$assignedTo, $visitorId]
             );
-            AuditLog::log("Assigned visitor to visitation team member", "visitors", $visitorId);
+            AuditLog::log("Assigned visitor to visitation member", "visitors", $visitorId);
             Session::flash('success', 'Visitor assigned successfully.');
         } catch (Throwable $e) {
             Session::flash('error', 'Failed to assign visitor: ' . $e->getMessage());

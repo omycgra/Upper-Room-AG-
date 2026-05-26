@@ -283,9 +283,9 @@
         <div class="px-10 py-10 bg-gradient-to-br from-accent/10 via-white/[0.02] to-transparent border-b border-white/5">
             <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
                 <div>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.35em]">Visitation Team</p>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.35em]">Visitation Members</p>
                     <h3 class="text-3xl sm:text-4xl font-black text-white tracking-tight mt-3">Assigned Visitor Follow-Up</h3>
-                    <p class="text-sm font-bold text-slate-400 mt-4 max-w-2xl">This dashboard focuses only on visitors assigned to the visitation team. Use the list below to review details and download the full working sheet.</p>
+                    <p class="text-sm font-bold text-slate-400 mt-4 max-w-2xl">This dashboard focuses only on visitors assigned to visitation members. Use the list below to review details and download the full working sheet.</p>
                 </div>
                 <a href="<?php echo BASE_URL; ?>/visitors/export" class="inline-flex items-center justify-center bg-accent text-slate-900 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
                     <i class="fas fa-download mr-2"></i> Download List
@@ -328,7 +328,7 @@
         </div>
         <div class="p-5 sm:p-6 lg:p-10">
             <?php if (empty($assignedVisitors)): ?>
-                <div class="text-center text-slate-500 font-bold italic py-10">No visitor has been assigned to the visitation team yet.</div>
+                <div class="text-center text-slate-500 font-bold italic py-10">No visitor has been assigned to a visitation member yet.</div>
             <?php else: ?>
                 <div class="hidden xl:block overflow-x-auto">
                     <table class="w-full min-w-[1200px] text-left">
@@ -606,7 +606,7 @@
                 <h4 class="text-xl font-black text-white tracking-tight">Departmental Savings</h4>
                 <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2"><?php echo htmlspecialchars($financeDept['month_label'] ?? date('F Y')); ?></p>
             </div>
-            <a href="<?php echo BASE_URL; ?>/finance#department-savings" class="text-[10px] font-black uppercase tracking-widest text-accent hover:underline">View all</a>
+            <a href="<?php echo BASE_URL; ?>/department-savings" class="text-[10px] font-black uppercase tracking-widest text-accent hover:underline">View all</a>
         </div>
         <div class="p-10">
             <?php if (empty($deptSavings)): ?>

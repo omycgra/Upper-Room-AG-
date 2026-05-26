@@ -54,18 +54,18 @@
                 <?php endif; ?>
             </div>
             <div class="flex flex-wrap gap-3">
-                <a href="#ledger" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
+                <a href="<?php echo BASE_URL; ?>/transactions" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
                     <i class="fas fa-receipt mr-2 text-accent"></i> Transactions
                 </a>
                 <?php if ($isStaff): ?>
                 <a href="<?php echo BASE_URL; ?>/finance/add" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
                     <i class="fas fa-calculator mr-2 text-accent"></i> Quick Entry
                 </a>
-                <a href="#department-savings" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
+                <a href="<?php echo BASE_URL; ?>/department-savings" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
                     <i class="fas fa-sitemap mr-2 text-accent"></i> Departmental Savings
                 </a>
                 <?php else: ?>
-                <a href="#department-savings" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
+                <a href="<?php echo BASE_URL; ?>/department-savings" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
                     <i class="fas fa-sitemap mr-2 text-accent"></i> Departmental Savings
                 </a>
                 <a href="#bank-details" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
@@ -358,73 +358,6 @@
     </div>
 <?php endif; ?>
 
-<div id="department-savings" class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden mb-12 card-interaction">
-    <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/[0.02]">
-        <div class="flex items-center">
-            <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
-                <i class="fas fa-piggy-bank text-accent text-sm"></i>
-            </div>
-            <h4 class="text-xl font-black text-white tracking-tight">Departmental Savings</h4>
-        </div>
-        <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-            <?php echo !empty($isDeptHead) ? 'Your Department' : htmlspecialchars($month_label ?? date('F Y')); ?>
-        </div>
-    </div>
-
-    <div class="p-5 sm:p-6 lg:p-10">
-        <?php if (empty($department_savings)): ?>
-            <div class="glass-card p-16 rounded-[2.5rem] border-white/5 text-center">
-                <div class="w-20 h-20 bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-white/10">
-                    <i class="fas fa-sitemap text-slate-700 text-3xl"></i>
-                </div>
-                <p class="text-slate-400 font-black uppercase tracking-widest text-xs">No departments found</p>
-            </div>
-        <?php else: ?>
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                <?php foreach ($department_savings as $row): ?>
-                    <?php
-                        $deptIncome = (float)($row['income_total'] ?? 0);
-                        $deptExpense = (float)($row['expense_total'] ?? 0);
-                        $deptBalance = (float)($row['balance'] ?? 0);
-                    ?>
-                    <div class="glass-card rounded-[2.5rem] p-5 sm:p-6 lg:p-8 border-white/5 hover:bg-white/[0.03] transition-all duration-500 group relative overflow-hidden card-interaction">
-                        <div class="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all duration-700"></div>
-                        <div class="relative z-10">
-                            <div class="flex items-start justify-between mb-8">
-                                <div>
-                                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Department</p>
-                                    <h5 class="text-xl font-black text-white tracking-tight mt-2"><?php echo htmlspecialchars($row['department_name'] ?? ''); ?></h5>
-                                </div>
-                                <div class="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 group-hover:bg-accent transition-all">
-                                    <i class="fas fa-coins text-accent group-hover:text-slate-900 transition-colors"></i>
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                                <div class="bg-white/5 rounded-2xl p-4 border border-white/5">
-                                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Income</p>
-                                    <p class="text-sm font-black text-emerald-400 mt-2"><?php echo $currency . ' ' . number_format($deptIncome, 2); ?></p>
-                                </div>
-                                <div class="bg-white/5 rounded-2xl p-4 border border-white/5">
-                                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Expenses</p>
-                                    <p class="text-sm font-black text-rose-400 mt-2"><?php echo $currency . ' ' . number_format($deptExpense, 2); ?></p>
-                                </div>
-                            </div>
-
-                            <div class="pt-6 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Net</p>
-                                <p class="text-lg font-black <?php echo $deptBalance >= 0 ? 'text-accent' : 'text-rose-400'; ?>">
-                                    <?php echo $currency . ' ' . number_format($deptBalance, 2); ?>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </div>
-</div>
-
 <?php if (!$isStaff): ?>
 <div id="bank-details" class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden mb-12 card-interaction">
         <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white/[0.02]">
@@ -677,172 +610,6 @@
     </div>
 </div>
 <?php endif; ?>
-
-<div id="ledger" class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
-    <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/[0.02]">
-        <div class="flex items-center">
-            <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
-                <i class="fas fa-receipt text-accent text-sm"></i>
-            </div>
-            <h4 class="text-xl font-black text-white tracking-tight">Transactions</h4>
-        </div>
-        <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest"><?php echo count($recent_transactions ?? []); ?> records</div>
-    </div>
-
-    <div class="md:hidden p-4 sm:p-6 space-y-4">
-        <?php if (empty($recent_transactions)): ?>
-            <div class="px-4 py-12 text-center text-slate-500 italic font-bold">No transactions recorded yet.</div>
-        <?php else: ?>
-            <?php foreach ($recent_transactions as $tx): ?>
-                <?php $isExpense = ($tx['transaction_type'] ?? '') === 'Expense'; ?>
-                <div class="glass-card rounded-[2rem] p-4 sm:p-5 border-white/10">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p class="text-sm font-black text-slate-200"><?php echo date('M d, Y', strtotime($tx['transaction_date'])); ?></p>
-                            <div class="mt-2">
-                                <span class="px-3 py-1.5 text-[9px] font-black rounded-full uppercase tracking-widest border <?php echo $isExpense ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'; ?>">
-                                    <?php echo htmlspecialchars($tx['transaction_type'] ?? ''); ?>
-                                </span>
-                            </div>
-                        </div>
-                        <p class="text-base font-black <?php echo $isExpense ? 'text-rose-400' : 'text-emerald-400'; ?>">
-                            <?php echo ($isExpense ? '-' : '') . $currency . ' ' . number_format((float)($tx['amount'] ?? 0), 2); ?>
-                        </p>
-                    </div>
-                    <div class="mt-4 space-y-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        <p>Method: <span class="text-slate-300"><?php echo htmlspecialchars($tx['payment_method'] ?? ''); ?></span></p>
-                        <p>Reference: <span class="text-slate-300"><?php echo htmlspecialchars(($tx['reference_no'] ?? '') !== '' ? $tx['reference_no'] : 'N/A'); ?></span></p>
-                    </div>
-                    <div class="mt-4 flex flex-wrap gap-2">
-                        <button type="button" onclick="openTransactionModal(<?php echo (int)$tx['id']; ?>)" class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-accent transition-all border border-white/5">
-                            <i class="fas fa-eye text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">View</span>
-                        </button>
-                        <?php if ($isStaff && (int)($tx['member_id'] ?? 0) > 0): ?>
-                            <button type="button" onclick="openReceiptModal(<?php echo (int)$tx['id']; ?>)" class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-accent transition-all border border-white/5">
-                                <i class="fas fa-print text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Receipt</span>
-                            </button>
-                        <?php endif; ?>
-                        <?php if ($isStaff): ?>
-                            <?php $isOwnTx = ((int)($tx['recorded_by'] ?? (int)Session::get('user_id')) === (int)Session::get('user_id')); ?>
-                            <?php if ($isOwnTx): ?>
-                                <?php $req = $activeChangeRequestMap[(int)($tx['id'] ?? 0)] ?? null; ?>
-                                <?php if ($req): ?>
-                                    <?php $reqStatus = strtolower(trim((string)($req['status'] ?? 'pending'))); ?>
-                                    <?php $editCount = (int)($req['edit_count'] ?? 0); ?>
-                                    <span class="h-10 px-4 inline-flex items-center justify-center rounded-xl border text-[10px] font-black uppercase tracking-widest <?php echo $reqStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-slate-300 border-white/10'; ?>">
-                                        <i class="fas fa-clock text-xs mr-2"></i><?php echo htmlspecialchars($reqStatus); ?><?php echo $reqStatus === 'approved' ? ' ' . $editCount . '/2' : ''; ?>
-                                    </span>
-                                    <?php if ($reqStatus === 'approved'): ?>
-                                        <button type="button" onclick="openEditTransactionModal(<?php echo (int)$tx['id']; ?>)" class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-accent text-slate-900 hover:scale-[1.02] transition-all font-black text-[10px] uppercase tracking-widest">
-                                            <i class="fas fa-pen-nib text-xs mr-2"></i>Edit
-                                        </button>
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    <button type="button" onclick="openRequestChangeModal(<?php echo (int)$tx['id']; ?>)" class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-accent transition-all border border-white/5">
-                                        <i class="fas fa-clipboard-list text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Request Edit</span>
-                                    </button>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                        <?php endif; ?>
-                        <?php if (!empty($isDeptHead)): ?>
-                            <button type="button" onclick="openEditTransactionModal(<?php echo (int)$tx['id']; ?>)" class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-accent transition-all border border-white/5">
-                                <i class="fas fa-pen-nib text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Edit</span>
-                            </button>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
-    </div>
-    <div class="hidden md:block overflow-x-auto custom-scrollbar">
-        <table class="w-full text-left border-collapse">
-            <thead>
-                <tr class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] border-b border-white/5 bg-white/[0.01]">
-                    <th class="px-10 py-6">Date</th>
-                    <th class="px-10 py-6">Transaction Type</th>
-                    <th class="px-10 py-6">Amount</th>
-                    <th class="px-10 py-6 hidden md:table-cell">Method</th>
-                    <th class="px-10 py-6 hidden lg:table-cell">Reference</th>
-                    <th class="px-10 py-6 text-right">Action</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-white/[0.02]">
-                <?php if (empty($recent_transactions)): ?>
-                    <tr>
-                        <td colspan="6" class="px-10 py-16 text-center text-slate-500 italic font-bold">No transactions recorded yet.</td>
-                    </tr>
-                <?php else: ?>
-                    <?php foreach ($recent_transactions as $tx): ?>
-                        <?php $isExpense = ($tx['transaction_type'] ?? '') === 'Expense'; ?>
-                        <tr class="hover:bg-white/[0.03] transition-all duration-300">
-                            <td class="px-10 py-6">
-                                <p class="text-sm font-black text-slate-200"><?php echo date('M d, Y', strtotime($tx['transaction_date'])); ?></p>
-                            </td>
-                            <td class="px-10 py-6">
-                                <span class="px-4 py-1.5 text-[9px] font-black rounded-full uppercase tracking-widest border <?php echo $isExpense ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'; ?>">
-                                    <?php echo htmlspecialchars($tx['transaction_type'] ?? ''); ?>
-                                </span>
-                            </td>
-                            <td class="px-10 py-6">
-                                <p class="text-lg font-black <?php echo $isExpense ? 'text-rose-400' : 'text-emerald-400'; ?>">
-                                    <?php echo ($isExpense ? '-' : '') . $currency . ' ' . number_format((float)($tx['amount'] ?? 0), 2); ?>
-                                </p>
-                            </td>
-                            <td class="px-10 py-6 hidden md:table-cell">
-                                <div class="flex items-center text-xs font-bold text-slate-400 uppercase tracking-tighter">
-                                    <i class="fas fa-credit-card mr-2 opacity-30"></i> <?php echo htmlspecialchars($tx['payment_method'] ?? ''); ?>
-                                </div>
-                            </td>
-                            <td class="px-10 py-6 hidden lg:table-cell">
-                                <p class="text-xs font-bold text-slate-400"><?php echo htmlspecialchars(($tx['reference_no'] ?? '') !== '' ? $tx['reference_no'] : 'N/A'); ?></p>
-                            </td>
-                            <td class="px-10 py-6 text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <button type="button" onclick="openTransactionModal(<?php echo (int)$tx['id']; ?>)" class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-accent transition-all border border-white/5">
-                                        <i class="fas fa-eye text-xs"></i>
-                                    </button>
-                                    <?php if ($isStaff && (int)($tx['member_id'] ?? 0) > 0): ?>
-                                        <button type="button" onclick="openReceiptModal(<?php echo (int)$tx['id']; ?>)" class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-accent transition-all border border-white/5">
-                                            <i class="fas fa-print text-xs"></i>
-                                        </button>
-                                    <?php endif; ?>
-                                    <?php if ($isStaff): ?>
-                                        <?php $isOwnTx = ((int)($tx['recorded_by'] ?? (int)Session::get('user_id')) === (int)Session::get('user_id')); ?>
-                                        <?php if ($isOwnTx): ?>
-                                            <?php $req = $activeChangeRequestMap[(int)($tx['id'] ?? 0)] ?? null; ?>
-                                            <?php if ($req): ?>
-                                                <?php $reqStatus = strtolower(trim((string)($req['status'] ?? 'pending'))); ?>
-                                                <?php if ($reqStatus === 'approved'): ?>
-                                                    <?php $editCount = (int)($req['edit_count'] ?? 0); ?>
-                                                    <button type="button" onclick="openEditTransactionModal(<?php echo (int)$tx['id']; ?>)" class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-accent text-slate-900 hover:scale-[1.02] transition-all border border-accent/30" title="Approved: Edit">
-                                                        <i class="fas fa-pen-nib text-xs"></i>
-                                                    </button>
-                                                <?php else: ?>
-                                                    <span class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-300 border border-white/10" title="Pending request">
-                                                        <i class="fas fa-clock text-xs"></i>
-                                                    </span>
-                                                <?php endif; ?>
-                                            <?php else: ?>
-                                                <button type="button" onclick="openRequestChangeModal(<?php echo (int)$tx['id']; ?>)" class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-accent transition-all border border-white/5" title="Request Edit">
-                                                    <i class="fas fa-clipboard-list text-xs"></i>
-                                                </button>
-                                            <?php endif; ?>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-                                    <?php if (!empty($isDeptHead)): ?>
-                                        <button type="button" onclick="openEditTransactionModal(<?php echo (int)$tx['id']; ?>)" class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-accent transition-all border border-white/5">
-                                            <i class="fas fa-pen-nib text-xs"></i>
-                                        </button>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
 
 <div id="bank-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
     <div class="glass-card w-full max-w-lg rounded-[3rem] sm:rounded-[3.5rem] overflow-hidden shadow-2xl transform transition-all duration-500 scale-95 opacity-0 border-white/10 max-h-[90vh] flex flex-col" id="bank-modal-content">

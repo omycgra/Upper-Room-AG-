@@ -1088,6 +1088,18 @@
                             <span class="ml-3 text-sm font-bold">Finance</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="<?php echo BASE_URL; ?>/transactions" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'transactions') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                            <i class="fas fa-receipt w-6 text-sm"></i>
+                            <span class="ml-3 text-sm font-bold">Transactions</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="<?php echo BASE_URL; ?>/department-savings" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'department-savings') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                            <i class="fas fa-piggy-bank w-6 text-sm"></i>
+                            <span class="ml-3 text-sm font-bold">Departmental Savings</span>
+                        </a>
+                    </li>
                     <?php endif; ?>
                     <?php if ($isAuditor): ?>
                         <li>
@@ -2036,6 +2048,9 @@
                 const meId = <?php echo json_encode((int)Session::get('user_id')); ?>;
                 const meName = <?php echo json_encode((string)Session::get('user_name', 'User')); ?>;
                 const mePhoto = <?php echo json_encode((string)Session::get('user_photo', '')); ?>;
+                const supabaseUrl = <?php echo json_encode(trim((string)Env::get('SUPABASE_URL', ''))); ?>;
+                const supabaseBucket = <?php echo json_encode(trim((string)Env::get('SUPABASE_STORAGE_BUCKET', '')) ?: 'uploads'); ?>;
+                const supabasePublicBase = supabaseUrl ? (String(supabaseUrl).replace(/\/+$/, '') + '/storage/v1/object/public/' + encodeURIComponent(String(supabaseBucket || 'uploads')) + '/') : '';
 
                 const widget = document.getElementById('support-chat-widget');
                 const toggle = document.getElementById('support-chat-toggle');
@@ -2096,6 +2111,13 @@
                     const uploadsIdx = p.indexOf('uploads/');
                     if (uploadsIdx >= 0 && publicIdx < 0) p = p.slice(uploadsIdx);
                     if (p.startsWith('uploads/')) p = 'public/' + p;
+                    if (supabasePublicBase && p.startsWith('public/uploads/')) {
+                        const objectPath = p.slice('public/uploads/'.length);
+                        if (objectPath) {
+                            const encoded = objectPath.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+                            return supabasePublicBase + encoded;
+                        }
+                    }
                     return baseUrl + '/' + p;
                 };
 
