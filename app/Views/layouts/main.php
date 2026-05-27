@@ -1046,6 +1046,20 @@
                             <span class="ml-3 text-sm font-bold"><?php echo $isAuditor ? 'Auditor' : 'Dashboard'; ?></span>
                         </a>
                     </li>
+                    <?php if ($isAuditor): ?>
+                        <li>
+                            <a href="<?php echo BASE_URL; ?>/transactions" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'transactions') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                                <i class="fas fa-receipt w-6 text-sm"></i>
+                                <span class="ml-3 text-sm font-bold">Transactions</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="<?php echo BASE_URL; ?>/department-savings" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'department-savings') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                                <i class="fas fa-piggy-bank w-6 text-sm"></i>
+                                <span class="ml-3 text-sm font-bold">Departmental Savings</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
                     <?php if (!$isAuditor && !$isPastor && !$isStaff && !$isVisitationTeam): ?>
                     <li>
                         <div class="flex items-center">
@@ -1078,6 +1092,34 @@
                             <a href="<?php echo BASE_URL; ?>/attendance" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'attendance') === 0 ? 'active-link' : 'text-slate-400'; ?>">
                                 <i class="fas fa-check-square w-6 text-sm"></i>
                                 <span class="ml-3 text-sm font-bold">Attendance</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+                    <?php if ($isPastor || $isVisitationTeam): ?>
+                        <li>
+                            <a href="<?php echo BASE_URL; ?>/attendance/view" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'attendance') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                                <i class="fas fa-check-square w-6 text-sm"></i>
+                                <span class="ml-3 text-sm font-bold">Attendance</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+                    <?php if ($isPastor): ?>
+                        <li>
+                            <a href="<?php echo BASE_URL; ?>/members" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'members') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                                <i class="fas fa-users w-6 text-sm"></i>
+                                <span class="ml-3 text-sm font-bold">Members</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="<?php echo BASE_URL; ?>/transactions" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'transactions') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                                <i class="fas fa-receipt w-6 text-sm"></i>
+                                <span class="ml-3 text-sm font-bold">Transactions</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="<?php echo BASE_URL; ?>/department-savings" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'department-savings') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                                <i class="fas fa-piggy-bank w-6 text-sm"></i>
+                                <span class="ml-3 text-sm font-bold">Departmental Savings</span>
                             </a>
                         </li>
                     <?php endif; ?>

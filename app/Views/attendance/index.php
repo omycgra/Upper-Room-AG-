@@ -6,6 +6,8 @@
     $serviceTypes = ['Sunday Service', 'Mid-week Service', 'Youth Meeting', 'Special Event'];
     $canManage = !empty($can_manage_attendance);
     $canDownload = !empty($can_download_attendance);
+    $pageRoute = trim((string)($attendance_page_route ?? 'attendance'));
+    if ($pageRoute === '') $pageRoute = 'attendance';
     $dailyDate = (string)($service_date ?? date('Y-m-d'));
     $dailyType = (string)($service_type ?? 'Sunday Service');
     $dailyReport = is_array($daily_report ?? null) ? $daily_report : [];
@@ -81,30 +83,30 @@
                 </div>
             <?php elseif ($mode === 'biotime'): ?>
                 <?php if (!empty($biotime_configured)): ?>
-                    <form action="<?php echo BASE_URL; ?>/attendance/syncBioTime" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        <div class="space-y-2">
-                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Date</label>
-                            <input type="date" name="service_date" required value="<?php echo date('Y-m-d'); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Type</label>
-                            <select name="service_type" required class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none appearance-none cursor-pointer">
-                                <?php foreach ($serviceTypes as $t): ?>
-                                    <option value="<?php echo htmlspecialchars($t); ?>"><?php echo htmlspecialchars($t); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="flex justify-start md:justify-end gap-2">
-                            <?php if ($canManage): ?>
+                    <?php if ($canManage): ?>
+                        <form action="<?php echo BASE_URL; ?>/attendance/syncBioTime" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div class="space-y-2">
+                                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Date</label>
+                                <input type="date" name="service_date" required value="<?php echo date('Y-m-d'); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Type</label>
+                                <select name="service_type" required class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none appearance-none cursor-pointer">
+                                    <?php foreach ($serviceTypes as $t): ?>
+                                        <option value="<?php echo htmlspecialchars($t); ?>"><?php echo htmlspecialchars($t); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="flex justify-start md:justify-end gap-2">
                                 <button type="submit" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow active:scale-95 transition-all">
                                     <i class="fas fa-fingerprint text-[12px] mr-2"></i> Sync
                                 </button>
                                 <button type="submit" formaction="<?php echo BASE_URL; ?>/attendance/pushOnline" class="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 inline-flex items-center justify-center">
                                     <i class="fas fa-cloud-arrow-up text-[12px] mr-2"></i> Push
                                 </button>
-                            <?php endif; ?>
-                        </div>
-                    </form>
+                            </div>
+                        </form>
+                    <?php endif; ?>
                     <p class="mt-5 text-[10px] font-black uppercase tracking-widest text-slate-500">BioTime URL: <span class="text-slate-300"><?php echo htmlspecialchars((string)($biotime_url ?? '')); ?></span></p>
 
                     <?php if ($canManage): ?>
@@ -136,42 +138,44 @@
                     </div>
                 <?php endif; ?>
             <?php else: ?>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div class="space-y-2">
-                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Date</label>
-                        <input id="quick-service-date" type="date" value="<?php echo date('Y-m-d'); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Type</label>
-                        <select id="quick-service-type" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none appearance-none cursor-pointer">
-                            <?php foreach ($serviceTypes as $t): ?>
-                                <option value="<?php echo htmlspecialchars($t); ?>"><?php echo htmlspecialchars($t); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="flex justify-start md:justify-end gap-2">
-                        <button type="button" id="quick-copy-btn" class="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 inline-flex items-center justify-center">
-                            <i class="fas fa-copy text-[12px] mr-2"></i> Copy Link
-                        </button>
-                        <a id="quick-open-link" href="<?php echo BASE_URL; ?>/attendance/quick" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow inline-flex items-center justify-center">
-                            <i class="fas fa-bolt text-[12px] mr-2"></i> Open
-                        </a>
-                    </div>
-                </div>
-                <div class="mt-6 grid grid-cols-1 <?php echo $mode === 'qrcode' ? 'md:grid-cols-3' : 'md:grid-cols-1'; ?> gap-6 items-start">
-                    <div class="<?php echo $mode === 'qrcode' ? 'md:col-span-2' : ''; ?> rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Attendance Link</p>
-                        <p class="mt-3 text-sm font-black text-slate-200 break-words" id="quick-link-text"></p>
-                        <p class="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Open this link on a phone to mark attendance</p>
-                    </div>
-                    <?php if ($mode === 'qrcode'): ?>
-                        <div class="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8 flex flex-col items-center">
-                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">QR Code</p>
-                            <img id="quick-qr-img" alt="Attendance QR" class="mt-4 w-44 h-44 rounded-2xl bg-white p-2">
-                            <p class="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Requires internet to render QR image</p>
+                <?php if ($canManage): ?>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div class="space-y-2">
+                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Date</label>
+                            <input id="quick-service-date" type="date" value="<?php echo date('Y-m-d'); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none">
                         </div>
-                    <?php endif; ?>
-                </div>
+                        <div class="space-y-2">
+                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Type</label>
+                            <select id="quick-service-type" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none appearance-none cursor-pointer">
+                                <?php foreach ($serviceTypes as $t): ?>
+                                    <option value="<?php echo htmlspecialchars($t); ?>"><?php echo htmlspecialchars($t); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="flex justify-start md:justify-end gap-2">
+                            <button type="button" id="quick-copy-btn" class="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 inline-flex items-center justify-center">
+                                <i class="fas fa-copy text-[12px] mr-2"></i> Copy Link
+                            </button>
+                            <a id="quick-open-link" href="<?php echo BASE_URL; ?>/attendance/quick" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow inline-flex items-center justify-center">
+                                <i class="fas fa-bolt text-[12px] mr-2"></i> Open
+                            </a>
+                        </div>
+                    </div>
+                    <div class="mt-6 grid grid-cols-1 <?php echo $mode === 'qrcode' ? 'md:grid-cols-3' : 'md:grid-cols-1'; ?> gap-6 items-start">
+                        <div class="<?php echo $mode === 'qrcode' ? 'md:col-span-2' : ''; ?> rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Attendance Link</p>
+                            <p class="mt-3 text-sm font-black text-slate-200 break-words" id="quick-link-text"></p>
+                            <p class="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Open this link on a phone to mark attendance</p>
+                        </div>
+                        <?php if ($mode === 'qrcode'): ?>
+                            <div class="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8 flex flex-col items-center">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">QR Code</p>
+                                <img id="quick-qr-img" alt="Attendance QR" class="mt-4 w-44 h-44 rounded-2xl bg-white p-2">
+                                <p class="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Requires internet to render QR image</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
 
                 <?php
                     $lanIp = '';
@@ -361,7 +365,7 @@
         <?php endif; ?>
     </div>
     <div class="p-6 sm:p-8 lg:p-10 space-y-8">
-        <form method="GET" action="<?php echo BASE_URL; ?>/attendance" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <form method="GET" action="<?php echo BASE_URL; ?>/<?php echo htmlspecialchars($pageRoute); ?>" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div class="space-y-2">
                 <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Date</label>
                 <input type="date" name="service_date" required value="<?php echo htmlspecialchars($dailyDate); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none">

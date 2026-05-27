@@ -109,10 +109,19 @@ class FinanceController extends BaseController {
                 $pendingDepartmentExpenseRequests = [];
             }
         }
+        $expFrom = $this->sanitizeDateParam($_GET['exp_from'] ?? null);
+        $expTo = $this->sanitizeDateParam($_GET['exp_to'] ?? null);
+        if ($expFrom !== null && $expTo === null) $expTo = $expFrom;
+        if ($expTo !== null && $expFrom === null) $expFrom = $expTo;
+
         $recentExpenses = [];
         if (!$isDeptHead) {
             try {
-                $recentExpenses = $financeModel->getRecentExpensesWithMeta(60);
+                if ($expFrom !== null && $expTo !== null) {
+                    $recentExpenses = $financeModel->getExpensesWithMetaByDateRange($expFrom, $expTo, 200);
+                } else {
+                    $recentExpenses = $financeModel->getRecentExpensesWithMeta(60);
+                }
             } catch (Throwable $e) {
                 $recentExpenses = [];
             }
@@ -164,6 +173,8 @@ class FinanceController extends BaseController {
             'department_bank' => $departmentBank,
             'recent_transactions' => $recentTransactions,
             'recent_expenses' => $recentExpenses,
+            'exp_from' => $expFrom,
+            'exp_to' => $expTo,
             'isDeptHead' => $isDeptHead,
             'isStaff' => $isStaff,
             'myDeptId' => $myDeptId,
@@ -188,6 +199,11 @@ class FinanceController extends BaseController {
             exit;
         }
 
+        $txFrom = $this->sanitizeDateParam($_GET['tx_from'] ?? null);
+        $txTo = $this->sanitizeDateParam($_GET['tx_to'] ?? null);
+        if ($txFrom !== null && $txTo === null) $txTo = $txFrom;
+        if ($txTo !== null && $txFrom === null) $txFrom = $txTo;
+
         $staffAllowedTypes = $this->getStaffAllowedTypes();
         $recentTransactions = [];
         $activeChangeRequestMap = [];
@@ -195,9 +211,17 @@ class FinanceController extends BaseController {
 
         if ($isStaff) {
             if (Auth::isFinanceHead()) {
-                $recentTransactions = $financeModel->getRecentTransactionsWithMeta(200);
+                if ($txFrom !== null && $txTo !== null) {
+                    $recentTransactions = $financeModel->getTransactionsWithMetaByDateRange($txFrom, $txTo, 200);
+                } else {
+                    $recentTransactions = $financeModel->getRecentTransactionsWithMeta(200);
+                }
             } else {
-                $recentTransactions = $financeModel->getRecentTransactionsByRecorderWithMeta((int)Session::get('user_id'), 200, $staffAllowedTypes);
+                if ($txFrom !== null && $txTo !== null) {
+                    $recentTransactions = $financeModel->getTransactionsWithMetaByDateRange($txFrom, $txTo, 200, null, (int)Session::get('user_id'), $staffAllowedTypes);
+                } else {
+                    $recentTransactions = $financeModel->getRecentTransactionsByRecorderWithMeta((int)Session::get('user_id'), 200, $staffAllowedTypes);
+                }
             }
 
             $myChangeRequests = $financeModel->getChangeRequestsForRequester((int)Session::get('user_id'), 200);
@@ -210,9 +234,19 @@ class FinanceController extends BaseController {
             }
             $approvedChangeRequestMap = $financeModel->getApprovedChangeRequestsForRequester((int)Session::get('user_id'));
         } else {
-            $recentTransactions = $isDeptHead
-                ? $financeModel->getRecentDepartmentTransactionsWithMeta($myDeptId, 200, null)
-                : $financeModel->getRecentTransactionsWithMeta(200);
+            if ($isDeptHead) {
+                if ($txFrom !== null && $txTo !== null) {
+                    $recentTransactions = $financeModel->getTransactionsWithMetaByDateRange($txFrom, $txTo, 200, $myDeptId);
+                } else {
+                    $recentTransactions = $financeModel->getRecentDepartmentTransactionsWithMeta($myDeptId, 200, null);
+                }
+            } else {
+                if ($txFrom !== null && $txTo !== null) {
+                    $recentTransactions = $financeModel->getTransactionsWithMetaByDateRange($txFrom, $txTo, 200);
+                } else {
+                    $recentTransactions = $financeModel->getRecentTransactionsWithMeta(200);
+                }
+            }
         }
 
         $db = Database::getInstance();
@@ -224,6 +258,8 @@ class FinanceController extends BaseController {
             'title' => 'Transactions',
             'bank' => $bank,
             'recent_transactions' => $recentTransactions,
+            'tx_from' => $txFrom,
+            'tx_to' => $txTo,
             'isDeptHead' => $isDeptHead,
             'isStaff' => $isStaff,
             'active_change_request_map' => $activeChangeRequestMap,
@@ -246,12 +282,26 @@ class FinanceController extends BaseController {
             exit;
         }
 
+        $scope = strtolower(trim((string)($_GET['scope'] ?? 'month')));
+        if (!in_array($scope, ['month', 'all'], true)) $scope = 'month';
+
+        $dateParam = $this->sanitizeDateParam($_GET['date'] ?? null);
+
         $month = (int)($_GET['month'] ?? date('m'));
         $year = (int)($_GET['year'] ?? date('Y'));
         if ($month < 1 || $month > 12) $month = (int)date('m');
         if ($year < 2000 || $year > ((int)date('Y') + 1)) $year = (int)date('Y');
 
-        $departmentSavings = $financeModel->getDepartmentSavingsSummary($month, $year, $isDeptHead ? $myDeptId : null, null);
+        if ($dateParam !== null) {
+            $month = (int)date('m', strtotime($dateParam));
+            $year = (int)date('Y', strtotime($dateParam));
+        }
+
+        if ($scope === 'all') {
+            $departmentSavings = $financeModel->getDepartmentSavingsSummaryAllTime($isDeptHead ? $myDeptId : null, null);
+        } else {
+            $departmentSavings = $financeModel->getDepartmentSavingsSummary($month, $year, $isDeptHead ? $myDeptId : null, null);
+        }
 
         $db = Database::getInstance();
         $bank = [
@@ -265,6 +315,8 @@ class FinanceController extends BaseController {
             'year' => $year,
             'month_label' => date('F Y', strtotime(sprintf('%04d-%02d-01', $year, $month))),
             'department_savings' => $departmentSavings,
+            'scope' => $scope,
+            'date' => $dateParam,
             'isDeptHead' => $isDeptHead,
             'isStaff' => $isStaff,
             'myDeptId' => $myDeptId,
@@ -1654,6 +1706,229 @@ class FinanceController extends BaseController {
             $types[] = 'Mini Harvest';
         }
         return $types;
+    }
+
+    private function sanitizeDateParam($value): ?string {
+        $v = trim((string)($value ?? ''));
+        if ($v === '') return null;
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) return null;
+        return $v;
+    }
+
+    public function downloadTransactions() {
+        $this->ensureFinanceSchema();
+        if (!Auth::isStaff() && !Auth::isDepartmentHead() && !Auth::isAuditor() && !Auth::isAdmin() && !Auth::isPastor()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/dashboard');
+            exit;
+        }
+
+        $mode = strtolower(trim((string)($_GET['mode'] ?? 'all')));
+        if (!in_array($mode, ['all', 'date'], true)) $mode = 'all';
+
+        $from = $this->sanitizeDateParam($_GET['from'] ?? ($_GET['tx_from'] ?? null));
+        $to = $this->sanitizeDateParam($_GET['to'] ?? ($_GET['tx_to'] ?? null));
+        if ($from !== null && $to === null) $to = $from;
+        if ($to !== null && $from === null) $from = $to;
+
+        $departmentId = null;
+        $recordedBy = null;
+        $allowedTypes = [];
+
+        if (Auth::isDepartmentHead()) {
+            $departmentId = (int)(Session::get('user_department_id') ?? 0);
+            if ($departmentId <= 0) {
+                Session::flash('error', 'Department access is not configured for this account.');
+                header('Location: ' . BASE_URL . '/dashboard');
+                exit;
+            }
+        }
+
+        if (Auth::isStaff() && !Auth::isFinanceHead()) {
+            $recordedBy = (int)(Session::get('user_id') ?? 0);
+            $allowedTypes = $this->getStaffAllowedTypes();
+        }
+
+        $financeModel = new Finance();
+        $rows = [];
+        if ($mode === 'date' && $from !== null && $to !== null) {
+            $rows = $financeModel->getTransactionsWithMetaByDateRange($from, $to, 5000, $departmentId, $recordedBy, $allowedTypes);
+        } else {
+            $rows = $financeModel->getTransactionsWithMetaByDateRange(null, null, 5000, $departmentId, $recordedBy, $allowedTypes);
+            $from = null;
+            $to = null;
+        }
+
+        $label = $from !== null && $to !== null ? ($from . '_to_' . $to) : 'all';
+        $filename = 'transactions_' . $label . '_' . date('Ymd_His') . '.csv';
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $out = fopen('php://output', 'w');
+        if (!$out) exit;
+
+        fputcsv($out, [
+            'date',
+            'transaction number',
+            'transaction type',
+            'amount',
+            'payment method',
+            'member',
+            'department',
+            'reference',
+            'description',
+            'recorded by'
+        ]);
+
+        foreach ($rows as $tx) {
+            fputcsv($out, [
+                (string)($tx['transaction_date'] ?? ''),
+                (string)($tx['transaction_number'] ?? ''),
+                (string)($tx['transaction_type'] ?? ''),
+                (string)($tx['amount'] ?? ''),
+                (string)($tx['payment_method'] ?? ''),
+                (string)($tx['member_name'] ?? ''),
+                (string)($tx['department_name'] ?? ''),
+                (string)($tx['reference_no'] ?? ''),
+                (string)($tx['description'] ?? ''),
+                (string)($tx['recorded_by_name'] ?? '')
+            ]);
+        }
+        fclose($out);
+        exit;
+    }
+
+    public function downloadExpenses() {
+        $this->ensureFinanceSchema();
+        if (!Auth::isStaff() && !Auth::isAuditor() && !Auth::isAdmin()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/dashboard');
+            exit;
+        }
+        if (Auth::isDepartmentHead()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/finance');
+            exit;
+        }
+
+        $mode = strtolower(trim((string)($_GET['mode'] ?? 'all')));
+        if (!in_array($mode, ['all', 'date'], true)) $mode = 'all';
+
+        $from = $this->sanitizeDateParam($_GET['from'] ?? ($_GET['exp_from'] ?? null));
+        $to = $this->sanitizeDateParam($_GET['to'] ?? ($_GET['exp_to'] ?? null));
+        if ($from !== null && $to === null) $to = $from;
+        if ($to !== null && $from === null) $from = $to;
+
+        $financeModel = new Finance();
+        $rows = [];
+        if ($mode === 'date' && $from !== null && $to !== null) {
+            $rows = $financeModel->getExpensesWithMetaByDateRange($from, $to, 5000);
+        } else {
+            $rows = $financeModel->getExpensesWithMetaByDateRange(null, null, 5000);
+            $from = null;
+            $to = null;
+        }
+
+        $label = $from !== null && $to !== null ? ($from . '_to_' . $to) : 'all';
+        $filename = 'expenses_' . $label . '_' . date('Ymd_His') . '.csv';
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $out = fopen('php://output', 'w');
+        if (!$out) exit;
+
+        fputcsv($out, [
+            'date',
+            'transaction number',
+            'amount',
+            'department',
+            'reference',
+            'description',
+            'recorded by'
+        ]);
+
+        foreach ($rows as $tx) {
+            fputcsv($out, [
+                (string)($tx['transaction_date'] ?? ''),
+                (string)($tx['transaction_number'] ?? ''),
+                (string)($tx['amount'] ?? ''),
+                (string)(($tx['department_name'] ?? '') !== '' ? $tx['department_name'] : 'Church'),
+                (string)($tx['reference_no'] ?? ''),
+                (string)($tx['description'] ?? ''),
+                (string)($tx['recorded_by_name'] ?? '')
+            ]);
+        }
+        fclose($out);
+        exit;
+    }
+
+    public function downloadDepartmentSavings() {
+        $this->ensureFinanceSchema();
+        if (!Auth::isStaff() && !Auth::isDepartmentHead() && !Auth::isAuditor() && !Auth::isAdmin() && !Auth::isPastor()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/dashboard');
+            exit;
+        }
+
+        $mode = strtolower(trim((string)($_GET['mode'] ?? 'month')));
+        if (!in_array($mode, ['month', 'all'], true)) $mode = 'month';
+
+        $dateParam = $this->sanitizeDateParam($_GET['date'] ?? null);
+        $month = (int)($_GET['month'] ?? date('m'));
+        $year = (int)($_GET['year'] ?? date('Y'));
+        if ($month < 1 || $month > 12) $month = (int)date('m');
+        if ($year < 2000 || $year > ((int)date('Y') + 1)) $year = (int)date('Y');
+        if ($dateParam !== null) {
+            $month = (int)date('m', strtotime($dateParam));
+            $year = (int)date('Y', strtotime($dateParam));
+        }
+
+        $departmentId = null;
+        if (Auth::isDepartmentHead()) {
+            $departmentId = (int)(Session::get('user_department_id') ?? 0);
+            if ($departmentId <= 0) {
+                Session::flash('error', 'Department access is not configured for this account.');
+                header('Location: ' . BASE_URL . '/dashboard');
+                exit;
+            }
+        }
+
+        $financeModel = new Finance();
+        if ($mode === 'all') {
+            $rows = $financeModel->getDepartmentSavingsSummaryAllTime($departmentId, null);
+            $label = 'all';
+        } else {
+            $rows = $financeModel->getDepartmentSavingsSummary($month, $year, $departmentId, null);
+            $label = sprintf('%04d-%02d', $year, $month);
+        }
+
+        $filename = 'department_savings_' . $label . '_' . date('Ymd_His') . '.csv';
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $out = fopen('php://output', 'w');
+        if (!$out) exit;
+
+        fputcsv($out, [
+            'department',
+            'income',
+            'expenses',
+            'balance'
+        ]);
+
+        foreach ($rows as $r) {
+            fputcsv($out, [
+                (string)($r['department_name'] ?? ''),
+                (string)($r['income_total'] ?? ''),
+                (string)($r['expense_total'] ?? ''),
+                (string)($r['balance'] ?? '')
+            ]);
+        }
+        fclose($out);
+        exit;
     }
 
     private function generateTransactionNumber($db) {

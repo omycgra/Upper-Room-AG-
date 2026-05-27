@@ -15,6 +15,8 @@
     $activeChangeRequestMap = $active_change_request_map ?? [];
     $approvedChangeRequestMap = $approved_change_request_map ?? [];
     $recentExpenses = $recent_expenses ?? [];
+    $expFrom = trim((string)($exp_from ?? ''));
+    $expTo = trim((string)($exp_to ?? ''));
 ?>
 
 <div class="flex flex-col sm:flex-row justify-between items-start mb-10 gap-4">
@@ -257,14 +259,39 @@
 
 <?php if (empty($isDeptHead)): ?>
 <div id="recent-expenses" class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden mb-12 card-interaction">
-    <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex items-center justify-between gap-3 bg-white/[0.02]">
+    <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white/[0.02]">
         <div class="flex items-center">
             <div class="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center mr-4 border border-rose-500/20">
                 <i class="fas fa-receipt text-rose-300 text-sm"></i>
             </div>
             <h4 class="text-xl font-black text-white tracking-tight">Recent Expenses</h4>
         </div>
-        <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest"><?php echo count($recentExpenses ?? []); ?> records</div>
+        <div class="w-full lg:w-auto flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-end">
+            <form method="GET" action="<?php echo BASE_URL; ?>/finance" class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+                <div>
+                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">From</label>
+                    <input type="date" name="exp_from" value="<?php echo htmlspecialchars($expFrom); ?>" class="w-full bg-white/5 border border-white/10 focus:border-rose-400 rounded-2xl px-5 py-3 text-sm font-bold text-white transition-all outline-none">
+                </div>
+                <div>
+                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">To</label>
+                    <input type="date" name="exp_to" value="<?php echo htmlspecialchars($expTo); ?>" class="w-full bg-white/5 border border-white/10 focus:border-rose-400 rounded-2xl px-5 py-3 text-sm font-bold text-white transition-all outline-none">
+                </div>
+                <button type="submit" class="glass-card px-6 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
+                    <i class="fas fa-search mr-2 text-rose-300"></i> Search
+                </button>
+            </form>
+            <?php if (Auth::isStaff() || Auth::isAdmin() || Auth::isAuditor()): ?>
+                <div class="flex gap-2">
+                    <a href="<?php echo BASE_URL; ?>/finance/downloadExpenses?mode=all" class="glass-card px-5 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all inline-flex items-center">
+                        <i class="fas fa-download mr-2 text-rose-300"></i> Download All
+                    </a>
+                    <a href="<?php echo BASE_URL; ?>/finance/downloadExpenses?mode=date&from=<?php echo urlencode($expFrom); ?>&to=<?php echo urlencode($expTo !== '' ? $expTo : $expFrom); ?>" class="glass-card px-5 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all inline-flex items-center">
+                        <i class="fas fa-calendar-day mr-2 text-rose-300"></i> Download By Date
+                    </a>
+                </div>
+            <?php endif; ?>
+            <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest sm:self-center lg:self-end"><?php echo count($recentExpenses ?? []); ?> records</div>
+        </div>
     </div>
     <div class="p-5 sm:p-6 lg:p-10">
         <?php if (empty($recentExpenses)): ?>

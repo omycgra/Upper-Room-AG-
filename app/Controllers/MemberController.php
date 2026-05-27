@@ -74,10 +74,7 @@ class MemberController extends BaseController {
         }
         $this->ensureMemberSchema();
         $memberModel = new Member();
-        
-        // Debug: Log raw POST data
-        error_log("Raw POST Data: " . print_r($_POST, true));
-        
+
         // Ensure values match database ENUMs (lowercase)
         $gender = strtolower($_POST['gender'] ?? 'male');
         $marital_status = strtolower($_POST['marital_status'] ?? 'single');

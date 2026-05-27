@@ -57,7 +57,68 @@ class AttendanceController extends BaseController {
             'service_type' => $serviceType,
             'daily_report' => $dailyReport,
             'can_manage_attendance' => Auth::isAdmin(),
-            'can_download_attendance' => (Auth::isAdmin() || Auth::isPastor() || Auth::isVisitationTeam())
+            'can_download_attendance' => (Auth::isAdmin() || Auth::isPastor() || Auth::isVisitationTeam()),
+            'attendance_page_route' => 'attendance'
+        ]);
+    }
+
+    public function view()
+    {
+        if (!Auth::isPastor() && !Auth::isVisitationTeam() && !Auth::isAdmin()) {
+            Session::flash('error', 'Unauthorized access.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/dashboard");
+            exit;
+        }
+        $this->ensureAttendanceSchema();
+
+        $attendanceModel = new Attendance();
+        $mode = $this->getAttendanceMode();
+        $biotimeConfigured = $this->isBioTimeConfigured();
+        $cloudUrl = rtrim(trim((string)AppConfig::getSetting('attendance_cloud_url', '')), '/');
+        $cloudTokenSet = trim((string)AppConfig::getSetting('attendance_cloud_token', '')) !== '';
+        $cloudConfigured = ($cloudUrl !== '' && $cloudTokenSet);
+        $cloudLastPushedAt = trim((string)AppConfig::getSetting('attendance_cloud_last_pushed_at', ''));
+
+        $serviceDate = trim((string)($_GET['service_date'] ?? date('Y-m-d')));
+        $serviceType = trim((string)($_GET['service_type'] ?? 'Sunday Service'));
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            $serviceDate = date('Y-m-d');
+        }
+        if ($serviceType === '') {
+            $serviceType = 'Sunday Service';
+        }
+        $serviceType = mb_substr($serviceType, 0, 100);
+
+        $dailyReport = $this->buildServiceAttendanceReport($serviceDate, $serviceType);
+
+        $recent = $attendanceModel->getRecentWithMember(50);
+        foreach ($recent as &$r) {
+            $checkInRaw = trim((string)($r['device_time'] ?? ''));
+            if ($checkInRaw === '') {
+                $checkInRaw = trim((string)($r['imported_at'] ?? ''));
+            }
+            $r['computed_status'] = $this->computeAttendanceStatus($r['service_date'] ?? '', $checkInRaw !== '' ? $checkInRaw : null);
+        }
+        unset($r);
+
+        View::render('attendance.index', [
+            'title' => 'Attendance',
+            'attendance_rate' => $attendanceModel->getAttendanceRate(),
+            'recent_records' => $recent,
+            'attendance_mode' => $mode,
+            'biotime_configured' => $biotimeConfigured,
+            'biotime_url' => $this->getBioTimeUrl(),
+            'cloud_configured' => $cloudConfigured,
+            'cloud_url' => $cloudUrl,
+            'cloud_last_pushed_at' => $cloudLastPushedAt,
+            'cloud_last_result' => '',
+            'service_date' => $serviceDate,
+            'service_type' => $serviceType,
+            'daily_report' => $dailyReport,
+            'can_manage_attendance' => false,
+            'can_download_attendance' => true,
+            'attendance_page_route' => 'attendance/view'
         ]);
     }
 

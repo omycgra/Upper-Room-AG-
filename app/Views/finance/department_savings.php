@@ -4,6 +4,9 @@
     if (!preg_match('/^[A-Z]{2,5}$/', $currency)) $currency = 'GHS';
     $month = (int)($month ?? (int)date('m'));
     $year = (int)($year ?? (int)date('Y'));
+    $scope = strtolower(trim((string)($scope ?? 'month')));
+    if (!in_array($scope, ['month', 'all'], true)) $scope = 'month';
+    $dateFilter = trim((string)($date ?? ''));
 ?>
 
 <div class="flex flex-col sm:flex-row justify-between items-start mb-10 gap-4">
@@ -12,8 +15,8 @@
         <p class="text-slate-400 font-bold mt-2 uppercase tracking-widest text-xs">Quick access summary for <span class="text-accent"><?php echo htmlspecialchars($churchName); ?></span></p>
     </div>
     <div class="flex flex-wrap gap-3">
-        <a href="<?php echo BASE_URL; ?>/finance" class="glass-card flex items-center px-6 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">
-            <i class="fas fa-arrow-left mr-2"></i> Finance
+        <a href="<?php echo BASE_URL; ?>/<?php echo Auth::isPastor() ? 'pastor' : 'finance'; ?>" class="glass-card flex items-center px-6 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">
+            <i class="fas fa-arrow-left mr-2"></i> <?php echo Auth::isPastor() ? 'Pastor' : 'Finance'; ?>
         </a>
         <a href="<?php echo BASE_URL; ?>/transactions" class="glass-card flex items-center px-6 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">
             <i class="fas fa-receipt mr-2"></i> Transactions
@@ -30,12 +33,24 @@
             <div>
                 <h4 class="text-xl font-black text-white tracking-tight">Summary</h4>
                 <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2">
-                    <?php echo !empty($isDeptHead) ? 'Your Department' : htmlspecialchars($month_label ?? date('F Y')); ?>
+                    <?php echo $scope === 'all' ? 'All time' : (!empty($isDeptHead) ? 'Your Department' : htmlspecialchars($month_label ?? date('F Y'))); ?>
                 </div>
             </div>
         </div>
 
-        <form method="GET" action="<?php echo BASE_URL; ?>/department-savings" class="w-full lg:w-auto flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+        <div class="w-full lg:w-auto flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+        <form method="GET" action="<?php echo BASE_URL; ?>/department-savings" class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+            <div class="flex-1 sm:flex-none">
+                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">Scope</label>
+                <select name="scope" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
+                    <option value="month" <?php echo $scope === 'month' ? 'selected' : ''; ?>>By Month</option>
+                    <option value="all" <?php echo $scope === 'all' ? 'selected' : ''; ?>>All Time</option>
+                </select>
+            </div>
+            <div class="flex-1 sm:flex-none">
+                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">Exact Date</label>
+                <input type="date" name="date" value="<?php echo htmlspecialchars($dateFilter); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-sm font-bold text-white transition-all outline-none">
+            </div>
             <div class="flex-1 sm:flex-none">
                 <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">Month</label>
                 <select name="month" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
@@ -69,6 +84,15 @@
                 <i class="fas fa-filter mr-2 text-accent"></i> Apply
             </button>
         </form>
+        <div class="flex gap-2">
+            <a href="<?php echo BASE_URL; ?>/department-savings/download?mode=all" class="glass-card px-6 py-4 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all inline-flex items-center">
+                <i class="fas fa-download mr-2 text-accent"></i> Download All
+            </a>
+            <a href="<?php echo BASE_URL; ?>/department-savings/download?mode=month&month=<?php echo (int)$month; ?>&year=<?php echo (int)$year; ?>&date=<?php echo urlencode($dateFilter); ?>" class="glass-card px-6 py-4 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all inline-flex items-center">
+                <i class="fas fa-calendar-day mr-2 text-accent"></i> Download By Date
+            </a>
+        </div>
+        </div>
     </div>
 
     <div class="p-5 sm:p-6 lg:p-10">
@@ -124,4 +148,3 @@
         <?php endif; ?>
     </div>
 </div>
-

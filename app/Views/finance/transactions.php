@@ -5,6 +5,8 @@
     $isStaff = !empty($isStaff);
     $activeChangeRequestMap = $active_change_request_map ?? [];
     $receiptData = $receipt_data ?? null;
+    $txFrom = trim((string)($tx_from ?? ''));
+    $txTo = trim((string)($tx_to ?? ''));
 ?>
 
 <div class="flex flex-col sm:flex-row justify-between items-start mb-10 gap-4">
@@ -13,10 +15,10 @@
         <p class="text-slate-400 font-bold mt-2 uppercase tracking-widest text-xs">Quick access ledger for <span class="text-accent"><?php echo htmlspecialchars($churchName); ?></span></p>
     </div>
     <div class="flex flex-wrap gap-3">
-        <a href="<?php echo BASE_URL; ?>/finance" class="glass-card flex items-center px-6 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">
-            <i class="fas fa-arrow-left mr-2"></i> Finance
+        <a href="<?php echo BASE_URL; ?>/<?php echo Auth::isPastor() ? 'pastor' : 'finance'; ?>" class="glass-card flex items-center px-6 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all">
+            <i class="fas fa-arrow-left mr-2"></i> <?php echo Auth::isPastor() ? 'Pastor' : 'Finance'; ?>
         </a>
-        <?php if (empty($isDeptHead) && !Auth::isAdmin()): ?>
+        <?php if (empty($isDeptHead) && !Auth::isAdmin() && !Auth::isPastor()): ?>
             <a href="<?php echo BASE_URL; ?>/finance/add" class="glass-card flex items-center px-6 py-3.5 rounded-2xl bg-accent text-slate-900 font-black text-xs uppercase tracking-widest hover:scale-[1.03] transition-all shadow-xl shadow-yellow-500/20">
                 <i class="fas fa-plus mr-2"></i> <?php echo $isStaff ? 'Record Transaction' : 'Add Transaction'; ?>
             </a>
@@ -25,14 +27,37 @@
 </div>
 
 <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
-    <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/[0.02]">
+    <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white/[0.02]">
         <div class="flex items-center">
             <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
                 <i class="fas fa-receipt text-accent text-sm"></i>
             </div>
             <h4 class="text-xl font-black text-white tracking-tight">Ledger</h4>
         </div>
-        <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest"><?php echo count($recent_transactions ?? []); ?> records</div>
+        <div class="w-full lg:w-auto flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-end">
+            <form method="GET" action="<?php echo BASE_URL; ?>/transactions" class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+                <div>
+                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">From</label>
+                    <input type="date" name="tx_from" value="<?php echo htmlspecialchars($txFrom); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-3 text-sm font-bold text-white transition-all outline-none">
+                </div>
+                <div>
+                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">To</label>
+                    <input type="date" name="tx_to" value="<?php echo htmlspecialchars($txTo); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-3 text-sm font-bold text-white transition-all outline-none">
+                </div>
+                <button type="submit" class="glass-card px-6 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
+                    <i class="fas fa-search mr-2 text-accent"></i> Search
+                </button>
+            </form>
+            <div class="flex gap-2">
+                <a href="<?php echo BASE_URL; ?>/transactions/download?mode=all" class="glass-card px-5 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all inline-flex items-center">
+                    <i class="fas fa-download mr-2 text-accent"></i> Download All
+                </a>
+                <a href="<?php echo BASE_URL; ?>/transactions/download?mode=date&from=<?php echo urlencode($txFrom); ?>&to=<?php echo urlencode($txTo !== '' ? $txTo : $txFrom); ?>" class="glass-card px-5 py-3.5 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all inline-flex items-center">
+                    <i class="fas fa-calendar-day mr-2 text-accent"></i> Download By Date
+                </a>
+            </div>
+            <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest sm:self-center lg:self-end"><?php echo count($recent_transactions ?? []); ?> records</div>
+        </div>
     </div>
 
     <div class="md:hidden p-4 sm:p-6 space-y-4">

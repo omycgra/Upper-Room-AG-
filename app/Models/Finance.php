@@ -237,6 +237,39 @@ class Finance extends BaseModel {
         }, $rows ?: []);
     }
 
+    public function getDepartmentSavingsSummaryAllTime($departmentId = null, $paymentMethod = null) {
+        $sql = "SELECT
+                    d.id as department_id,
+                    d.name as department_name,
+                    COALESCE(SUM(CASE WHEN f.transaction_type <> 'Expense' THEN f.amount ELSE 0 END), 0) as income_total,
+                    COALESCE(SUM(CASE WHEN f.transaction_type = 'Expense' THEN f.amount ELSE 0 END), 0) as expense_total
+                FROM departments d
+                LEFT JOIN finances f
+                    ON f.department_id = d.id
+                WHERE 1=1";
+        $params = [];
+        if ($departmentId !== null) {
+            $sql .= " AND d.id = ?";
+            $params[] = (int)$departmentId;
+        }
+        if ($paymentMethod !== null) {
+            $sql .= " AND f.payment_method = ?";
+            $params[] = (string)$paymentMethod;
+        }
+        $sql .= " GROUP BY d.id, d.name
+                  ORDER BY d.name ASC";
+
+        $rows = $this->db->fetchAll($sql, $params);
+        return array_map(function ($r) {
+            $income = (float)($r['income_total'] ?? 0);
+            $expense = (float)($r['expense_total'] ?? 0);
+            $r['income_total'] = $income;
+            $r['expense_total'] = $expense;
+            $r['balance'] = $income - $expense;
+            return $r;
+        }, $rows ?: []);
+    }
+
     public function getDepartmentAggregateTotals($month = null, $year = null, $departmentId = null, $paymentMethod = null) {
         $rows = $this->getDepartmentSavingsSummary($month, $year, $departmentId, $paymentMethod);
         $income = 0.0;
@@ -315,6 +348,51 @@ class Finance extends BaseModel {
                 ORDER BY f.transaction_date DESC, f.id DESC
                 LIMIT $limit";
         return $this->db->fetchAll($sql);
+    }
+
+    public function getTransactionsWithMetaByDateRange(?string $fromDate, ?string $toDate, $limit = 200, $departmentId = null, $recordedBy = null, array $allowedTypes = []) {
+        $limit = (int)$limit;
+        if ($limit <= 0) $limit = 200;
+        if ($limit > 5000) $limit = 5000;
+
+        $where = "WHERE 1=1";
+        $params = [];
+
+        if ($fromDate !== null && $toDate !== null) {
+            $endExclusive = date('Y-m-d', strtotime($toDate . ' +1 day'));
+            $where .= " AND f.transaction_date >= ? AND f.transaction_date < ?";
+            $params[] = $fromDate;
+            $params[] = $endExclusive;
+        }
+
+        if ($departmentId !== null) {
+            $where .= " AND f.department_id = ?";
+            $params[] = (int)$departmentId;
+        }
+        if ($recordedBy !== null) {
+            $where .= " AND f.recorded_by = ?";
+            $params[] = (int)$recordedBy;
+        }
+
+        if (!empty($allowedTypes)) {
+            $placeholders = implode(',', array_fill(0, count($allowedTypes), '?'));
+            $where .= " AND f.transaction_type IN ($placeholders)";
+            $params = array_merge($params, array_values($allowedTypes));
+        }
+
+        $sql = "SELECT
+                    f.*,
+                    CONCAT(COALESCE(m.first_name,''), ' ', COALESCE(m.last_name,'')) as member_name,
+                    d.name as department_name,
+                    u.name as recorded_by_name
+                FROM finances f
+                LEFT JOIN members m ON m.id = f.member_id
+                LEFT JOIN departments d ON d.id = f.department_id
+                LEFT JOIN users u ON u.id = f.recorded_by
+                $where
+                ORDER BY f.transaction_date DESC, f.id DESC
+                LIMIT $limit";
+        return $this->db->fetchAll($sql, $params) ?: [];
     }
 
     public function getRecentDepartmentTransactionsWithMeta($departmentId, $limit = 50, $paymentMethod = null) {
@@ -483,6 +561,10 @@ class Finance extends BaseModel {
                 ORDER BY f.transaction_date DESC, f.id DESC
                 LIMIT $limit";
         return $this->db->fetchAll($sql);
+    }
+
+    public function getExpensesWithMetaByDateRange(?string $fromDate, ?string $toDate, $limit = 200, $departmentId = null, $recordedBy = null) {
+        return $this->getTransactionsWithMetaByDateRange($fromDate, $toDate, $limit, $departmentId, $recordedBy, ['Expense']);
     }
 
     public function getTransactionWithMeta($id) {

@@ -2,6 +2,8 @@
     $churchName = AppConfig::getSetting('church_name', 'Church Management');
     $isDeptHead = (Session::get('user_role') === 'dept_head');
     $myDeptId = $isDeptHead ? (int)(Session::get('user_department_id') ?? 0) : 0;
+    $canEditMember = Auth::isAdmin();
+    $canAddMember = Auth::isAdmin() || $isDeptHead;
 ?>
 <div class="flex flex-col sm:flex-row justify-between items-start mb-10 gap-4">
     <div>
@@ -14,9 +16,11 @@
                 <i class="fas fa-file-download mr-2"></i> Export All
             </a>
         <?php endif; ?>
-        <button onclick="showModal('add-modal', 'add-modal-content')" class="glass-card flex items-center justify-center px-6 py-3.5 rounded-2xl bg-accent text-slate-900 font-black text-xs uppercase tracking-widest hover:scale-[1.05] transition-all">
-            <i class="fas fa-plus mr-2"></i> Add Member
-        </button>
+        <?php if ($canAddMember): ?>
+            <button onclick="showModal('add-modal', 'add-modal-content')" class="glass-card flex items-center justify-center px-6 py-3.5 rounded-2xl bg-accent text-slate-900 font-black text-xs uppercase tracking-widest hover:scale-[1.05] transition-all">
+                <i class="fas fa-plus mr-2"></i> Add Member
+            </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -206,7 +210,7 @@
                                 <button onclick="viewMember(<?php echo $member['id']; ?>)" class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-500 hover-glow-blue transition-all duration-500 border border-white/5">
                                     <i class="fas fa-eye text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">View</span>
                                 </button>
-                                <?php if (!$isDeptHead): ?>
+                                <?php if ($canEditMember): ?>
                                     <button onclick="editMember(<?php echo $member['id']; ?>)" class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-500 hover-glow-yellow transition-all duration-500 border border-white/5">
                                         <i class="fas fa-pen-nib text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Edit</span>
                                     </button>
@@ -299,7 +303,7 @@
                                     <button onclick="viewMember(<?php echo $member['id']; ?>)" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-slate-500 hover-glow-blue transition-all duration-500 border border-white/5">
                                         <i class="fas fa-eye text-xs"></i>
                                     </button>
-                                    <?php if (!$isDeptHead): ?>
+                                    <?php if ($canEditMember): ?>
                                         <button onclick="editMember(<?php echo $member['id']; ?>)" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-slate-500 hover-glow-yellow transition-all duration-500 border border-white/5">
                                             <i class="fas fa-pen-nib text-xs"></i>
                                         </button>
@@ -456,9 +460,11 @@
             </div>
 
             <div class="mt-12 pt-10 border-t border-white/5 flex flex-col sm:flex-row gap-4">
-                <button id="modal-edit-btn" class="flex-1 bg-accent text-slate-900 py-5 rounded-[1.5rem] text-center font-black text-xs uppercase tracking-[0.2em] hover-glow-yellow active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
-                    Modify Profile
-                </button>
+                <?php if ($canEditMember): ?>
+                    <button id="modal-edit-btn" class="flex-1 bg-accent text-slate-900 py-5 rounded-[1.5rem] text-center font-black text-xs uppercase tracking-[0.2em] hover-glow-yellow active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                        Modify Profile
+                    </button>
+                <?php endif; ?>
                 <button onclick="closeModal('member-modal', 'modal-content')" class="px-10 bg-white/5 text-slate-400 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-white/10 transition-all">
                     Dismiss
                 </button>
@@ -467,6 +473,7 @@
     </div>
 </div>
 
+<?php if ($canEditMember): ?>
 <!-- Edit Member Modal -->
 <div id="edit-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-50 hidden flex items-center justify-center p-4">
     <div class="glass-card w-full max-w-2xl rounded-[3.5rem] overflow-hidden shadow-2xl transform transition-all duration-500 scale-95 opacity-0 max-h-[90vh] flex flex-col border-white/10" id="edit-modal-content">
@@ -482,7 +489,7 @@
                 </button>
             </div>
         </div>
-
+ 
         <form action="<?php echo BASE_URL; ?>/members/update" method="POST" enctype="multipart/form-data" class="flex-1 overflow-y-auto custom-scrollbar bg-slate-900/50">
             <div class="p-10">
                 <input type="hidden" name="id" id="edit-id">
@@ -762,7 +769,9 @@
         </form>
     </div>
 </div>
+<?php endif; ?>
 
+<?php if ($canAddMember): ?>
 <!-- Add Member Modal -->
 <div id="add-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-50 hidden flex items-center justify-center p-4">
     <div class="glass-card w-full max-w-2xl rounded-[3.5rem] overflow-hidden shadow-2xl transform transition-all duration-500 scale-95 opacity-0 max-h-[90vh] flex flex-col border-white/10" id="add-modal-content">
@@ -1078,7 +1087,8 @@
             </form>
         </div>
     </div>
-</div>
+ </div>
+<?php endif; ?>
 
 <script>
     function boolValue(value) {
@@ -1169,10 +1179,13 @@
             statusBadge.textContent = 'ACTIVE';
             statusBadge.className = `px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border bg-emerald-50 text-emerald-700 border-emerald-100`;
 
-            document.getElementById('modal-edit-btn').onclick = () => {
-                closeModal('member-modal', 'modal-content');
-                setTimeout(() => editMember(data.id), 300);
-            };
+            const editBtn = document.getElementById('modal-edit-btn');
+            if (editBtn) {
+                editBtn.onclick = () => {
+                    closeModal('member-modal', 'modal-content');
+                    setTimeout(() => editMember(data.id), 300);
+                };
+            }
 
             showModal('member-modal', 'modal-content');
         } catch (error) {
@@ -1184,6 +1197,7 @@
     async function editMember(id) {
         const modal = document.getElementById('edit-modal');
         const modalContent = document.getElementById('edit-modal-content');
+        if (!modal || !modalContent) return;
 
         try {
             const response = await fetch(`<?php echo BASE_URL; ?>/members/viewAjax?id=${id}`);

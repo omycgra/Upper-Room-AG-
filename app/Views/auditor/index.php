@@ -16,6 +16,12 @@
         <p class="text-slate-400 font-bold mt-2 uppercase tracking-widest text-xs">Read-only monitoring and report downloads</p>
     </div>
     <div class="flex flex-wrap gap-3">
+        <a href="<?php echo BASE_URL; ?>/transactions" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
+            <i class="fas fa-receipt mr-2 text-accent"></i> Transactions
+        </a>
+        <a href="<?php echo BASE_URL; ?>/department-savings" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
+            <i class="fas fa-piggy-bank mr-2 text-accent"></i> Departmental Savings
+        </a>
         <a href="<?php echo BASE_URL; ?>/reports" class="glass-card px-5 py-3 rounded-2xl border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all">
             <i class="fas fa-chart-pie mr-2 text-accent"></i> Open Reports
         </a>
@@ -87,48 +93,12 @@
                 </div>
                 <h4 class="text-xl font-black text-white tracking-tight">Departmental Savings</h4>
             </div>
-            <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest"><?php echo htmlspecialchars($monthLabel); ?></div>
+            <a href="<?php echo BASE_URL; ?>/department-savings" class="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-accent transition-colors">Open</a>
         </div>
         <div class="p-5 sm:p-6 lg:p-10">
-            <?php if (empty($departmentSavings)): ?>
-                <div class="px-4 py-12 text-center text-slate-500 italic font-bold">No departmental savings found.</div>
-            <?php else: ?>
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] border-b border-white/5 bg-white/[0.01]">
-                                <th class="px-6 py-5">Department</th>
-                                <th class="px-6 py-5">Income</th>
-                                <th class="px-6 py-5">Expenses</th>
-                                <th class="px-6 py-5">Net</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/[0.02]">
-                            <?php foreach ($departmentSavings as $row): ?>
-                                <?php
-                                    $income = (float)($row['income_total'] ?? 0);
-                                    $expense = (float)($row['expense_total'] ?? 0);
-                                    $net = (float)($row['balance'] ?? ($income - $expense));
-                                ?>
-                                <tr class="hover:bg-white/[0.03] transition-all duration-300">
-                                    <td class="px-6 py-5">
-                                        <p class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($row['department_name'] ?? ''); ?></p>
-                                    </td>
-                                    <td class="px-6 py-5">
-                                        <p class="text-sm font-black text-emerald-400"><?php echo $currency . ' ' . number_format($income, 2); ?></p>
-                                    </td>
-                                    <td class="px-6 py-5">
-                                        <p class="text-sm font-black text-rose-400"><?php echo $currency . ' ' . number_format($expense, 2); ?></p>
-                                    </td>
-                                    <td class="px-6 py-5">
-                                        <p class="text-sm font-black <?php echo $net >= 0 ? 'text-accent' : 'text-rose-400'; ?>"><?php echo $currency . ' ' . number_format($net, 2); ?></p>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
+            <div class="text-slate-400 font-bold text-sm">
+                Use the Departmental Savings page to search by exact date/month and download CSV (all or by date).
+            </div>
         </div>
     </div>
 
@@ -188,63 +158,13 @@
             <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
                 <i class="fas fa-wallet text-accent text-sm"></i>
             </div>
-            <h4 class="text-xl font-black text-white tracking-tight">Recent Transactions</h4>
+            <h4 class="text-xl font-black text-white tracking-tight">Transactions</h4>
         </div>
-        <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest"><?php echo count($recentTransactions); ?> records</div>
+        <a href="<?php echo BASE_URL; ?>/transactions" class="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-accent transition-colors">Open</a>
     </div>
     <div class="p-5 sm:p-6 lg:p-10">
-        <?php if (empty($recentTransactions)): ?>
-            <div class="px-4 py-12 text-center text-slate-500 italic font-bold">No transactions recorded yet.</div>
-        <?php else: ?>
-            <div class="overflow-x-auto custom-scrollbar">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] border-b border-white/5 bg-white/[0.01]">
-                            <th class="px-6 py-5">Date</th>
-                            <th class="px-6 py-5">Type</th>
-                            <th class="px-6 py-5">Amount</th>
-                            <th class="px-6 py-5 hidden lg:table-cell">Method</th>
-                            <th class="px-6 py-5 hidden lg:table-cell">Department</th>
-                            <th class="px-6 py-5">Recorded By</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-white/[0.02]">
-                        <?php foreach ($recentTransactions as $tx): ?>
-                            <?php
-                                $isExpense = ($tx['transaction_type'] ?? '') === 'Expense';
-                                $label = (string)($tx['transaction_type'] ?? '');
-                                if ($label === 'Offering' && !empty($tx['offering_subtype'])) {
-                                    $label = 'Offering (' . (string)$tx['offering_subtype'] . ')';
-                                }
-                            ?>
-                            <tr class="hover:bg-white/[0.03] transition-all duration-300">
-                                <td class="px-6 py-5">
-                                    <p class="text-sm font-black text-slate-200"><?php echo htmlspecialchars(date('M d, Y', strtotime($tx['transaction_date']))); ?></p>
-                                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1"><?php echo htmlspecialchars($tx['transaction_number'] ?? ''); ?></p>
-                                </td>
-                                <td class="px-6 py-5">
-                                    <p class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($label); ?></p>
-                                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1"><?php echo htmlspecialchars(($tx['member_name'] ?? '') !== '' ? $tx['member_name'] : ''); ?></p>
-                                </td>
-                                <td class="px-6 py-5">
-                                    <p class="text-sm font-black <?php echo $isExpense ? 'text-rose-400' : 'text-emerald-400'; ?>">
-                                        <?php echo ($isExpense ? '-' : '') . $currency . ' ' . number_format((float)($tx['amount'] ?? 0), 2); ?>
-                                    </p>
-                                </td>
-                                <td class="px-6 py-5 hidden lg:table-cell">
-                                    <p class="text-xs font-bold text-slate-400"><?php echo htmlspecialchars($tx['payment_method'] ?? ''); ?></p>
-                                </td>
-                                <td class="px-6 py-5 hidden lg:table-cell">
-                                    <p class="text-xs font-bold text-slate-400"><?php echo htmlspecialchars(($tx['department_name'] ?? '') !== '' ? $tx['department_name'] : 'Church'); ?></p>
-                                </td>
-                                <td class="px-6 py-5">
-                                    <p class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($tx['recorded_by_name'] ?? ''); ?></p>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+        <div class="text-slate-400 font-bold text-sm">
+            Use the Transactions page to search by date and download CSV (all or by date).
+        </div>
     </div>
 </div>
