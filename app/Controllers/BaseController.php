@@ -94,6 +94,7 @@ class BaseController {
                 'sms',
                 'sms/balance',
                 'sms/send',
+                'debug/sms-logs',
                 'chat/threads',
                 'chat/messages',
                 'chat/send',
@@ -109,7 +110,6 @@ class BaseController {
                 $allowed[] = 'finance/pendingApprovals';
                 $allowed[] = 'reports';
                 $allowed[] = 'reports/download';
-                $allowed[] = 'debug/sms-logs';
             }
             $this->guardRoute($currentRoute, $allowed);
         }

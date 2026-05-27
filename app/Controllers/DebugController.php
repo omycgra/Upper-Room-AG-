@@ -3,17 +3,9 @@ require_once __DIR__ . '/BaseController.php';
 
 class DebugController extends BaseController {
     public function smsLogs() {
-        if (!Auth::isAdmin() && !Auth::isFinanceHead()) {
+        if (!Auth::isAdmin() && !Auth::isStaff()) {
             Session::flash('error', 'Unauthorized access.');
             header('Location: ' . BASE_URL . '/dashboard');
-            exit;
-        }
-
-        $appEnv = strtolower((string)Env::get('APP_ENV', 'development'));
-        $appDebug = Env::bool('APP_DEBUG', $appEnv !== 'production');
-        if (!$appDebug) {
-            http_response_code(404);
-            echo 'Not Found';
             exit;
         }
 
@@ -47,14 +39,6 @@ class DebugController extends BaseController {
 
     public function clearSmsLogs() {
         $this->isAdmin();
-
-        $appEnv = strtolower((string)Env::get('APP_ENV', 'development'));
-        $appDebug = Env::bool('APP_DEBUG', $appEnv !== 'production');
-        if (!$appDebug) {
-            http_response_code(404);
-            echo 'Not Found';
-            exit;
-        }
 
         $path = ROOT_PATH . '/.dbg/trae-debug-log-sms-not-delivered.ndjson';
         if (file_exists($path)) {

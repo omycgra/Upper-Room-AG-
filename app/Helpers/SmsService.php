@@ -1024,7 +1024,7 @@ class SmsService {
                 // #region debug-point sms-4
                 $this->dbgEvent('H4', 'pre-transport', [
                     'provider' => 'mnotify',
-                    'endpoint' => $url,
+                    'endpoint' => $this->redactUrlSecrets($url),
                     'http' => (int)$httpCode,
                     'curl_error' => (string)$err
                 ]);
@@ -1045,7 +1045,7 @@ class SmsService {
                     // #region debug-point sms-5
                     $this->dbgEvent('H1', 'pre-provider', [
                         'provider' => 'mnotify',
-                        'endpoint' => $url,
+                        'endpoint' => $this->redactUrlSecrets($url),
                         'http' => (int)$httpCode,
                         'status' => $status,
                         'code' => $code,
@@ -1065,7 +1065,7 @@ class SmsService {
             // #region debug-point sms-6
             $this->dbgEvent('H1', 'pre-provider', [
                 'provider' => 'mnotify',
-                'endpoint' => $url,
+                'endpoint' => $this->redactUrlSecrets($url),
                 'http' => (int)$httpCode,
                 'error' => $messageText,
                 'raw' => $this->dbgTrunc($body, 800)
@@ -1333,6 +1333,13 @@ class SmsService {
         if ($t === '') return '';
         if (mb_strlen($t) <= $maxLen) return $t;
         return mb_substr($t, 0, $maxLen) . '...';
+    }
+
+    private function redactUrlSecrets(string $url): string {
+        $url = trim($url);
+        if ($url === '') return $url;
+        $url = preg_replace('/([?&]key=)[^&]+/i', '$1***', $url);
+        return (string)$url;
     }
     // #endregion debug-point sms-debug
 
