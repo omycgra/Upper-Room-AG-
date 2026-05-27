@@ -68,16 +68,86 @@ class Member extends BaseModel {
     }
 
     public function searchAndFilter($term = '', $deptId = '', $status = '', $sort = '', $added = '') {
-        $sql = "SELECT m.*, d.name as department_name, d.name as primary_department_name
+        $sql = "SELECT m.*, c.name as cluster_name, d.name as department_name, d.name as primary_department_name
                 FROM members m
+                LEFT JOIN clusters c ON m.cluster_id = c.id
                 LEFT JOIN departments d ON m.department_id = d.id
                 WHERE 1=1";
         $params = [];
 
-        if (!empty($term)) {
-            $sql .= " AND (m.first_name LIKE ? OR m.last_name LIKE ? OR m.member_code LIKE ? OR COALESCE(m.bio_id, '') LIKE ? OR m.phone LIKE ?)";
-            $likeTerm = "%$term%";
-            $params = array_merge($params, [$likeTerm, $likeTerm, $likeTerm, $likeTerm, $likeTerm]);
+        $term = trim((string)$term);
+        if ($term !== '') {
+            $isPg = $this->db->isPgsql();
+            $likeOp = $isPg ? 'ILIKE' : 'LIKE';
+            $phoneExpr = $isPg
+                ? "REGEXP_REPLACE(COALESCE(m.phone, ''), '[^0-9]', '', 'g')"
+                : "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(m.phone, ''), ' ', ''), '-', ''), '+', ''), '/', ''), '.', '')";
+
+            $clean = preg_replace('/\s+/', ' ', $term);
+            $tokens = array_values(array_filter(array_map('trim', preg_split('/\s+/', $clean) ?: []), fn($v) => $v !== ''));
+
+            $digits = preg_replace('/\D+/', '', $clean);
+            $phoneCandidates = [];
+            if ($digits !== '' && strlen($digits) >= 4) {
+                $phoneCandidates[] = $digits;
+                if (strlen($digits) === 10 && $digits[0] === '0') {
+                    $phoneCandidates[] = '233' . substr($digits, 1);
+                }
+                if (strlen($digits) === 12 && substr($digits, 0, 3) === '233') {
+                    $phoneCandidates[] = '0' . substr($digits, 3);
+                }
+                $phoneCandidates = array_values(array_unique($phoneCandidates));
+            }
+
+            // Tokenized search: every token must match at least one field.
+            // This fixes cases like searching "John Doe" where first_name/last_name are separate columns.
+            $fields = [
+                'm.first_name',
+                'm.last_name',
+                'm.member_code',
+                "COALESCE(m.bio_id, '')",
+                "COALESCE(m.phone, '')",
+                "COALESCE(m.email, '')",
+                "COALESCE(m.address, '')",
+                "COALESCE(m.stays_at, '')",
+                "COALESCE(c.name, '')",
+                "COALESCE(d.name, '')",
+            ];
+
+            $tokenClauses = [];
+            foreach ($tokens as $t) {
+                $or = [];
+                $likeTerm = '%' . $t . '%';
+                foreach ($fields as $f) {
+                    $or[] = "$f $likeOp ?";
+                    $params[] = $likeTerm;
+                }
+                // Also match additional department assignments (member_departments) by department name.
+                $or[] = "EXISTS (
+                    SELECT 1
+                    FROM member_departments md
+                    INNER JOIN departments dd ON dd.id = md.department_id
+                    WHERE md.member_id = m.id
+                      AND dd.name $likeOp ?
+                )";
+                $params[] = $likeTerm;
+                $tokenClauses[] = '(' . implode(' OR ', $or) . ')';
+            }
+
+            // Also include phone digit fragment search when term is numeric-ish.
+            // This helps match "0256..." even if the stored phone contains separators/spaces.
+            if (!empty($phoneCandidates)) {
+                $or = [];
+                foreach ($phoneCandidates as $pc) {
+                    $or[] = "$phoneExpr $likeOp ?";
+                    $params[] = '%' . $pc . '%';
+                }
+                $tokenClauses[] = '(' . implode(' OR ', $or) . ')';
+            }
+
+            if (!empty($tokenClauses)) {
+                $sql .= ' AND ' . implode(' AND ', $tokenClauses);
+            }
         }
 
         if (!empty($deptId)) {

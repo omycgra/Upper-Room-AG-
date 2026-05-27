@@ -789,10 +789,76 @@ class SettingController extends BaseController {
                 $db->query("ALTER TABLE users ADD COLUMN department_id INT NULL");
             }
 
+            if (!$db->columnExists('users', 'permissions_json')) {
+                $db->query("ALTER TABLE users ADD COLUMN permissions_json " . ($db->isPgsql() ? 'TEXT' : 'TEXT') . " NULL");
+            }
+
             if (!$db->columnExists('users', 'last_activity_at')) {
                 $db->query("ALTER TABLE users ADD COLUMN last_activity_at " . ($db->isPgsql() ? 'TIMESTAMP' : 'DATETIME') . " NULL");
             }
         });
+    }
+
+    public function updateUserCustomAccess() {
+        $this->isAdmin();
+
+        $db = Database::getInstance();
+        $this->ensureUserSchema($db);
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        if ($userId <= 0) {
+            Session::flash('error', 'Invalid user selected.');
+            $this->redirectSettings();
+        }
+
+        $user = $db->fetch("SELECT id, email, role FROM users WHERE id = ? LIMIT 1", [$userId]);
+        if (!$user) {
+            Session::flash('error', 'User not found.');
+            $this->redirectSettings();
+        }
+
+        $routes = $_POST['routes'] ?? [];
+        if (!is_array($routes)) $routes = [$routes];
+        $routes = array_values(array_unique(array_filter(array_map(function ($v) {
+            return trim((string)$v);
+        }, $routes), fn($v) => $v !== '')));
+
+        $allowedRoutes = [
+            'members',
+            'members/viewAjax',
+            'members/store',
+            'members/export',
+            'attendance/view',
+            'attendance/download',
+            'visitors',
+            'visitors/details',
+            'visitors/export',
+            'transactions',
+            'transactions/download',
+            'department-savings',
+            'department-savings/download',
+            'reports',
+            'reports/download',
+            'sms',
+            'sms/balance',
+            'sms/send',
+            'chat/threads',
+            'chat/messages',
+        ];
+
+        $routes = array_values(array_filter($routes, function ($r) use ($allowedRoutes) {
+            return in_array($r, $allowedRoutes, true);
+        }));
+
+        try {
+            $db->query("UPDATE users SET permissions_json = ? WHERE id = ?", [json_encode($routes), $userId]);
+            AuditLog::log("Updated custom access for user: " . ($user['email'] ?? 'Unknown'), "users", $userId);
+            Session::flash('success', 'Custom access updated.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to update custom access: ' . $e->getMessage());
+        }
+
+        $this->redirectSettings();
     }
 
     private function ensurePasswordResetRequestSchema($db) {

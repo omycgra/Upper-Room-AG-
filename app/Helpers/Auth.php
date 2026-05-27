@@ -68,6 +68,9 @@ class Auth {
             Session::set('user_name', $user['name'] ?: ($user['username'] ?? 'Admin'));
             Session::set('user_photo', $user['photo_path'] ?? null);
             Session::set('user_department_id', $user['department_id'] ?? null);
+            $rawPerms = (string)($user['permissions_json'] ?? '');
+            Session::set('user_permissions_json', $rawPerms);
+            Session::set('user_permissions', self::decodePermissions($rawPerms));
             Session::set('just_logged_in', true);
 
             $rawRole = strtolower(trim((string)($user['role'] ?? '')));
@@ -213,6 +216,47 @@ class Auth {
         return in_array($role, ['pastor'], true);
     }
 
+    public static function permissions(): array {
+        $p = Session::get('user_permissions');
+        return is_array($p) ? $p : [];
+    }
+
+    public static function hasPermission(string $pattern): bool {
+        $pattern = trim($pattern);
+        if ($pattern === '') return false;
+        foreach (self::permissions() as $p) {
+            $p = trim((string)$p);
+            if ($p === '') continue;
+            if (self::routeMatches((string)$pattern, $p)) return true;
+        }
+        return false;
+    }
+
+    public static function routeMatches(string $route, string $pattern): bool {
+        $route = trim($route, '/');
+        $pattern = trim($pattern, '/');
+        if ($pattern === '') return false;
+        if ($pattern === $route) return true;
+        if (substr($pattern, -2) === '/*') {
+            $prefix = substr($pattern, 0, -2);
+            return $prefix === '' ? true : ($route === $prefix || strpos($route, $prefix . '/') === 0);
+        }
+        return false;
+    }
+
+    private static function decodePermissions(string $raw): array {
+        $raw = trim($raw);
+        if ($raw === '') return [];
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) return [];
+        $out = [];
+        foreach ($decoded as $v) {
+            $s = trim((string)$v);
+            if ($s !== '') $out[] = $s;
+        }
+        return array_values(array_unique($out));
+    }
+
     private static function ensureSchema($db) {
         SchemaState::once('users_schema', function () use ($db) {
             if (!$db->columnExists('users', 'username')) {
@@ -225,6 +269,10 @@ class Auth {
 
             if (!$db->columnExists('users', 'department_id')) {
                 $db->query("ALTER TABLE users ADD COLUMN department_id INT NULL");
+            }
+
+            if (!$db->columnExists('users', 'permissions_json')) {
+                $db->query("ALTER TABLE users ADD COLUMN permissions_json " . ($db->isPgsql() ? 'TEXT' : 'TEXT') . " NULL");
             }
 
             $roleType = $db->getColumnDataType('users', 'role');

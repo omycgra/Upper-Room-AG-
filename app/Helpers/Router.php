@@ -92,6 +92,7 @@ class Router {
         $this->add('settings/user/updateUsername', 'SettingController@updateUserUsername');
         $this->add('settings/user/updateRole', 'SettingController@updateUserRole');
         $this->add('settings/user/updatePhoto', 'SettingController@updateUserPhoto');
+        $this->add('settings/user/updateCustomAccess', 'SettingController@updateUserCustomAccess');
         $this->add('settings/user/approvePasswordReset', 'SettingController@approvePasswordReset');
         $this->add('settings/user/rejectPasswordReset', 'SettingController@rejectPasswordReset');
         $this->add('cluster', 'ClusterController@index');

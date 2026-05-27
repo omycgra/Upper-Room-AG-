@@ -194,6 +194,15 @@
                                             class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
                                             <i class="fas fa-user-gear text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Edit Permission</span>
                                         </button>
+                                        <button type="button"
+                                            data-edit-custom-access="1"
+                                            data-user-id="<?php echo (int)$user['id']; ?>"
+                                            data-user-name="<?php echo htmlspecialchars((string)$user['name']); ?>"
+                                            data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
+                                            data-user-custom-access="<?php echo htmlspecialchars((string)($user['permissions_json'] ?? '')); ?>"
+                                            class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
+                                            <i class="fas fa-sliders text-xs mr-2"></i><span class="text-[10px] font-black uppercase tracking-widest">Custom Access</span>
+                                        </button>
                                         <a href="settings/user/delete?id=<?php echo $user['id']; ?>" 
                                            onclick="return confirm('Security Check: Permanent deletion of this account?')"
                                            class="inline-flex w-full sm:w-auto h-10 items-center justify-center rounded-xl bg-white/5 px-4 text-slate-500 hover-glow-red transition-all duration-500 border border-white/5">
@@ -298,6 +307,15 @@
                                                     data-user-department-id="<?php echo htmlspecialchars((string)($user['department_id'] ?? '')); ?>"
                                                     class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
                                                     <i class="fas fa-user-gear text-xs"></i>
+                                                </button>
+                                                <button type="button"
+                                                    data-edit-custom-access="1"
+                                                    data-user-id="<?php echo (int)$user['id']; ?>"
+                                                    data-user-name="<?php echo htmlspecialchars((string)$user['name']); ?>"
+                                                    data-user-email="<?php echo htmlspecialchars((string)$user['email']); ?>"
+                                                    data-user-custom-access="<?php echo htmlspecialchars((string)($user['permissions_json'] ?? '')); ?>"
+                                                    class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-all duration-500 border border-white/5">
+                                                    <i class="fas fa-sliders text-xs"></i>
                                                 </button>
                                                 <a href="settings/user/delete?id=<?php echo $user['id']; ?>" 
                                                    onclick="return confirm('Security Check: Permanent deletion of this account?')"
@@ -1231,6 +1249,65 @@
     </div>
 </div>
 
+<?php if ($isAdmin): ?>
+<div id="custom-access-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-xl rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center mb-10">
+            <div>
+                <h3 class="text-3xl font-black text-white tracking-tighter">Custom Access</h3>
+                <p id="custom-access-target" class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2"></p>
+            </div>
+            <button type="button" onclick="document.getElementById('custom-access-modal').classList.add('hidden')" class="w-10 h-10 bg-white/5 hover:bg-accent hover:text-slate-900 text-slate-400 rounded-xl flex items-center justify-center transition-all border border-white/10">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+
+        <form action="<?php echo BASE_URL; ?>/settings/user/updateCustomAccess" method="POST" data-loader="top" class="space-y-8">
+            <input type="hidden" name="user_id" id="custom-access-user-id" value="">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <?php
+                    $customAccessOptions = [
+                        ['members', 'Members List'],
+                        ['members/store', 'Add Member'],
+                        ['members/viewAjax', 'View Member Details'],
+                        ['members/export', 'Export Members CSV'],
+                        ['attendance/view', 'Attendance (View)'],
+                        ['attendance/download', 'Attendance (Download)'],
+                        ['transactions', 'Transactions (View)'],
+                        ['transactions/download', 'Transactions (Download)'],
+                        ['department-savings', 'Departmental Savings (View)'],
+                        ['department-savings/download', 'Departmental Savings (Download)'],
+                        ['visitors', 'Visitors (List)'],
+                        ['visitors/details', 'Visitors (Details)'],
+                        ['visitors/export', 'Visitors (Export)'],
+                        ['reports', 'Reports (View)'],
+                        ['reports/download', 'Reports (Download)'],
+                        ['sms', 'SMS Page'],
+                        ['sms/balance', 'SMS Balance'],
+                        ['sms/send', 'SMS Send'],
+                        ['chat/threads', 'Chat Threads'],
+                        ['chat/messages', 'Chat Messages'],
+                    ];
+                ?>
+                <?php foreach ($customAccessOptions as $opt): ?>
+                    <label class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 hover:bg-white/10 transition-all cursor-pointer">
+                        <input type="checkbox" class="w-5 h-5 accent-yellow-400" name="routes[]" value="<?php echo htmlspecialchars($opt[0]); ?>">
+                        <div class="min-w-0">
+                            <div class="text-sm font-black text-slate-200 truncate"><?php echo htmlspecialchars($opt[1]); ?></div>
+                            <div class="text-[10px] font-black uppercase tracking-widest text-slate-500 truncate"><?php echo htmlspecialchars($opt[0]); ?></div>
+                        </div>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+
+            <button type="submit" class="w-full bg-accent text-slate-900 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                Save Custom Access
+            </button>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
 <div id="reset-password-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4">
     <div class="glass-card w-full max-w-md rounded-[3rem] p-6 sm:p-12 shadow-2xl border-white/10 transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center mb-10">
@@ -1379,6 +1456,52 @@
             const btn = e.target.closest('[data-edit-user-photo="1"]');
             if (!btn) return;
             open(btn.dataset.userId, btn.dataset.userName, btn.dataset.userEmail);
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.add('hidden');
+        });
+    })();
+</script>
+<?php endif; ?>
+
+<?php if ($isAdmin): ?>
+<script>
+    (function () {
+        const modal = document.getElementById('custom-access-modal');
+        const userIdInput = document.getElementById('custom-access-user-id');
+        const label = document.getElementById('custom-access-target');
+        if (!modal || !userIdInput || !label) return;
+
+        const setChecked = (routes) => {
+            const set = new Set(Array.isArray(routes) ? routes.map(v => String(v || '').trim()).filter(Boolean) : []);
+            modal.querySelectorAll('input[type="checkbox"][name="routes[]"]').forEach((cb) => {
+                cb.checked = set.has(String(cb.value));
+            });
+        };
+
+        const open = (id, name, email, rawJson) => {
+            userIdInput.value = String(id || '');
+            const safeName = (name || '').trim();
+            const safeEmail = (email || '').trim();
+            label.textContent = safeName !== '' ? `${safeName} • ${safeEmail}` : safeEmail;
+
+            let routes = [];
+            const raw = String(rawJson || '').trim();
+            if (raw !== '') {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) routes = parsed;
+                } catch (e) {}
+            }
+            setChecked(routes);
+            modal.classList.remove('hidden');
+        };
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-edit-custom-access="1"]');
+            if (!btn) return;
+            open(btn.dataset.userId, btn.dataset.userName, btn.dataset.userEmail, btn.dataset.userCustomAccess);
         });
 
         modal.addEventListener('click', (e) => {

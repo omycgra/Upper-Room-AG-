@@ -3,7 +3,7 @@
     $isDeptHead = (Session::get('user_role') === 'dept_head');
     $myDeptId = $isDeptHead ? (int)(Session::get('user_department_id') ?? 0) : 0;
     $canEditMember = Auth::isAdmin();
-    $canAddMember = Auth::isAdmin() || $isDeptHead;
+    $canAddMember = Auth::isAdmin() || ($isDeptHead && Auth::hasPermission('members/store'));
 ?>
 <div class="flex flex-col sm:flex-row justify-between items-start mb-10 gap-4">
     <div>
@@ -504,7 +504,7 @@
                             <label for="edit-photo" class="absolute -bottom-2 -right-2 w-12 h-12 bg-accent text-slate-900 rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-all shadow-xl z-20">
                                 <i class="fas fa-camera text-sm"></i>
                             </label>
-                            <input type="file" name="photo" id="edit-photo" class="hidden" accept="image/*" onchange="previewImage(this, 'edit-photo-preview')">
+                            <input type="file" name="photo" id="edit-photo" class="hidden" accept="image/*" capture="environment" onchange="previewImage(this, 'edit-photo-preview')">
                         </div>
                         <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] mt-6">Upload New Profile Image</p>
                     </div>
@@ -829,7 +829,7 @@
                             <label for="add-photo" class="absolute -bottom-2 -right-2 w-12 h-12 bg-accent text-slate-900 rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-all shadow-xl z-20">
                                 <i class="fas fa-plus text-sm"></i>
                             </label>
-                            <input type="file" name="photo" id="add-photo" class="hidden" accept="image/*" onchange="previewImage(this, 'add-photo-preview')">
+                            <input type="file" name="photo" id="add-photo" class="hidden" accept="image/*" capture="environment" onchange="previewImage(this, 'add-photo-preview')">
                         </div>
                         <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] mt-6">Upload Profile Image</p>
                     </div>

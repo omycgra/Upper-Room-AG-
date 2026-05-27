@@ -32,11 +32,24 @@ class BaseController {
                 $now = time();
                 if ($lastPing <= 0 || ($now - $lastPing) >= 30) {
                     $db->query("UPDATE users SET last_activity_at = NOW() WHERE id = ?", [$userId]);
-                    $row = $db->fetch("SELECT photo_path FROM users WHERE id = ? LIMIT 1", [$userId]);
+                    $row = $db->fetch("SELECT photo_path, permissions_json FROM users WHERE id = ? LIMIT 1", [$userId]);
                     $photoPath = trim((string)($row['photo_path'] ?? ''));
                     $sessionPhoto = trim((string)Session::get('user_photo', ''));
                     if ($photoPath !== $sessionPhoto) {
                         Session::set('user_photo', $photoPath !== '' ? $photoPath : null);
+                    }
+                    $rawPerms = (string)($row['permissions_json'] ?? '');
+                    $sessionRawPerms = (string)Session::get('user_permissions_json', '');
+                    if ($rawPerms !== $sessionRawPerms) {
+                        Session::set('user_permissions_json', $rawPerms);
+                        $decoded = json_decode(trim((string)$rawPerms), true);
+                        if (!is_array($decoded)) $decoded = [];
+                        $out = [];
+                        foreach ($decoded as $v) {
+                            $s = trim((string)$v);
+                            if ($s !== '') $out[] = $s;
+                        }
+                        Session::set('user_permissions', array_values(array_unique($out)));
                     }
                     Session::set('last_activity_ping', $now);
                 }
@@ -67,7 +80,6 @@ class BaseController {
                 'logout',
                 'members',
                 'members/viewAjax',
-                'members/store',
                 'finance',
                 'transactions',
                 'transactions/download',
@@ -217,7 +229,7 @@ class BaseController {
     }
 
     private function guardRoute($currentRoute, array $allowed) {
-        if (!in_array($currentRoute, $allowed, true)) {
+        if (!in_array($currentRoute, $allowed, true) && !Auth::hasPermission($currentRoute)) {
             Session::flash('error', 'Unauthorized access.');
             header('Location: ' . $this->resolveHomeRoute());
             exit;
