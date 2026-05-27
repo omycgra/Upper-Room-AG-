@@ -81,13 +81,27 @@
                             <?php
                                 $name = trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? ''));
                                 $code = trim((string)($member['member_code'] ?? ''));
+                                $photoUrl = Branding::mediaUrl((string)($member['photo_path'] ?? ''));
+                                $firstInitial = mb_substr(trim((string)($member['first_name'] ?? '')), 0, 1);
+                                $lastInitial = mb_substr(trim((string)($member['last_name'] ?? '')), 0, 1);
+                                $initials = trim(strtoupper($firstInitial . $lastInitial));
+                                if ($initials === '') $initials = '—';
                             ?>
                             <tr class="hover:bg-white/[0.03] cursor-pointer" onclick="const c=this.querySelector('input'); if(c) c.click();">
                                 <td class="px-6 py-4">
                                     <input type="checkbox" name="member_ids[]" value="<?php echo (int)($member['id'] ?? 0); ?>" class="rounded border-white/10 bg-white/5 text-accent focus:ring-0 member-check" onclick="event.stopPropagation()">
                                 </td>
                                 <td class="px-6 py-4">
-                                    <div class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($name !== '' ? $name : ('#' . (int)($member['id'] ?? 0))); ?></div>
+                                    <div class="flex items-center gap-3">
+                                        <?php if (trim($photoUrl) !== ''): ?>
+                                            <img src="<?php echo htmlspecialchars($photoUrl); ?>" alt="" class="w-9 h-9 rounded-full object-cover border border-white/10 bg-white/5">
+                                        <?php else: ?>
+                                            <div class="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black text-slate-300">
+                                                <?php echo htmlspecialchars($initials); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($name !== '' ? $name : ('#' . (int)($member['id'] ?? 0))); ?></div>
+                                    </div>
                                 </td>
                                 <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($code !== '' ? $code : '—'); ?></td>
                             </tr>

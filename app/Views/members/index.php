@@ -145,11 +145,13 @@
 
         let debounceTimer = null;
         let inflight = null;
+        let lastAppliedQuery = '';
 
         const setBusy = (busy) => {
             form.setAttribute('aria-busy', busy ? 'true' : 'false');
             const controls = [searchInput, sort, dept, status, added].filter(Boolean);
             controls.forEach((el) => {
+                if (el === searchInput) return;
                 if (el && 'disabled' in el) el.disabled = !!busy;
             });
             const wrap = document.getElementById(resultsId);
@@ -181,6 +183,14 @@
             return url;
         };
 
+        const currentQueryKey = () => {
+            const qs = new URLSearchParams(new FormData(form));
+            for (const [k, v] of Array.from(qs.entries())) {
+                if (String(v).trim() === '') qs.delete(k);
+            }
+            return qs.toString();
+        };
+
         const renderFromHtml = (html) => {
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const next = doc.getElementById(resultsId);
@@ -190,6 +200,9 @@
         };
 
         const load = (pushState) => {
+            const key = currentQueryKey();
+            if (pushState && key === lastAppliedQuery) return;
+            lastAppliedQuery = key;
             if (inflight) inflight.abort();
             inflight = new AbortController();
             const url = buildUrl();
@@ -214,10 +227,15 @@
         added?.addEventListener('change', onFilterChange);
 
         if (searchInput) {
-            searchInput.addEventListener('input', () => {
+            const scheduleSearch = (delayMs) => {
                 if (debounceTimer) clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => load(true), 350);
-            });
+                debounceTimer = setTimeout(() => {
+                    load(true);
+                }, delayMs);
+            };
+
+            searchInput.addEventListener('input', () => scheduleSearch(220));
+            searchInput.addEventListener('blur', () => scheduleSearch(0));
         }
 
         form.addEventListener('submit', (e) => {
@@ -590,7 +608,20 @@
                             <label for="edit-photo" class="absolute -bottom-2 -right-2 w-12 h-12 bg-accent text-slate-900 rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-all shadow-xl z-20">
                                 <i class="fas fa-camera text-sm"></i>
                             </label>
+                            <button type="button" id="edit-photo-snap-open" class="absolute -bottom-2 -left-2 w-12 h-12 bg-white/10 text-slate-200 rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all shadow-xl z-20 border border-white/10">
+                                <i class="fas fa-video text-sm"></i>
+                            </button>
                             <input type="file" name="photo" id="edit-photo" class="hidden" accept="image/*" capture="environment" onchange="previewImage(this, 'edit-photo-preview')">
+                        </div>
+                        <div id="edit-photo-snapper" class="hidden w-full max-w-md mt-6">
+                            <div class="w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40">
+                                <video id="edit-photo-video" autoplay playsinline class="w-full h-64 object-cover"></video>
+                            </div>
+                            <canvas id="edit-photo-canvas" class="hidden"></canvas>
+                            <div class="mt-4 flex items-center justify-center gap-3">
+                                <button type="button" id="edit-photo-capture" class="h-11 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow transition-all">Snap</button>
+                                <button type="button" id="edit-photo-snap-cancel" class="h-11 px-6 rounded-2xl bg-white/5 text-slate-200 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all border border-white/10">Cancel</button>
+                            </div>
                         </div>
                         <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] mt-6">Upload New Profile Image</p>
                     </div>
@@ -915,7 +946,20 @@
                             <label for="add-photo" class="absolute -bottom-2 -right-2 w-12 h-12 bg-accent text-slate-900 rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-all shadow-xl z-20">
                                 <i class="fas fa-plus text-sm"></i>
                             </label>
+                            <button type="button" id="add-photo-snap-open" class="absolute -bottom-2 -left-2 w-12 h-12 bg-white/10 text-slate-200 rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all shadow-xl z-20 border border-white/10">
+                                <i class="fas fa-video text-sm"></i>
+                            </button>
                             <input type="file" name="photo" id="add-photo" class="hidden" accept="image/*" capture="environment" onchange="previewImage(this, 'add-photo-preview')">
+                        </div>
+                        <div id="add-photo-snapper" class="hidden w-full max-w-md mt-6">
+                            <div class="w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40">
+                                <video id="add-photo-video" autoplay playsinline class="w-full h-64 object-cover"></video>
+                            </div>
+                            <canvas id="add-photo-canvas" class="hidden"></canvas>
+                            <div class="mt-4 flex items-center justify-center gap-3">
+                                <button type="button" id="add-photo-capture" class="h-11 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow transition-all">Snap</button>
+                                <button type="button" id="add-photo-snap-cancel" class="h-11 px-6 rounded-2xl bg-white/5 text-slate-200 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all border border-white/10">Cancel</button>
+                            </div>
                         </div>
                         <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] mt-6">Upload Profile Image</p>
                     </div>
@@ -1348,6 +1392,88 @@
         }
     }
 
+    (function () {
+        const streams = new Map();
+
+        const stopStream = (key) => {
+            const s = streams.get(key);
+            if (s && s.getTracks) {
+                s.getTracks().forEach((t) => t.stop());
+            }
+            streams.delete(key);
+        };
+
+        const applyBlobToFileInput = (input, blob, filename) => {
+            const dt = new DataTransfer();
+            const f = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+            dt.items.add(f);
+            input.files = dt.files;
+        };
+
+        const setupSnapper = (key) => {
+            const openBtn = document.getElementById(`${key}-photo-snap-open`);
+            const snapper = document.getElementById(`${key}-photo-snapper`);
+            const video = document.getElementById(`${key}-photo-video`);
+            const canvas = document.getElementById(`${key}-photo-canvas`);
+            const captureBtn = document.getElementById(`${key}-photo-capture`);
+            const cancelBtn = document.getElementById(`${key}-photo-snap-cancel`);
+            const input = document.getElementById(`${key}-photo`);
+            const previewId = `${key}-photo-preview`;
+
+            if (!openBtn || !snapper || !video || !canvas || !captureBtn || !cancelBtn || !input) return;
+
+            const open = async () => {
+                stopStream(key);
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' } },
+                        audio: false
+                    });
+                    streams.set(key, stream);
+                    video.srcObject = stream;
+                    snapper.classList.remove('hidden');
+                } catch (e) {
+                    alert('Camera permission denied or camera not available.');
+                }
+            };
+
+            const close = () => {
+                stopStream(key);
+                snapper.classList.add('hidden');
+                try { video.srcObject = null; } catch (e) {}
+            };
+
+            openBtn.addEventListener('click', open);
+            cancelBtn.addEventListener('click', close);
+
+            captureBtn.addEventListener('click', async () => {
+                const w = video.videoWidth || 0;
+                const h = video.videoHeight || 0;
+                if (w <= 0 || h <= 0) return;
+
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                ctx.drawImage(video, 0, 0, w, h);
+
+                const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                if (!blob) return;
+                applyBlobToFileInput(input, blob, `${key}-photo.jpg`);
+                previewImage(input, previewId);
+                close();
+            });
+        };
+
+        setupSnapper('add');
+        setupSnapper('edit');
+
+        window.__stopAllMemberPhotoStreams = () => {
+            stopStream('add');
+            stopStream('edit');
+        };
+    })();
+
     function showModal(modalId, contentId) {
         const modal = document.getElementById(modalId);
         const content = document.getElementById(contentId);
@@ -1363,6 +1489,9 @@
         const content = document.getElementById(contentId);
         content.classList.remove('scale-100', 'opacity-100');
         content.classList.add('scale-95', 'opacity-0');
+        if (typeof window.__stopAllMemberPhotoStreams === 'function') {
+            window.__stopAllMemberPhotoStreams();
+        }
         setTimeout(() => {
             modal.classList.add('hidden');
         }, 300);
