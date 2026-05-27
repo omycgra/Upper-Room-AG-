@@ -138,16 +138,101 @@
         const dept = document.getElementById('members-filter-department');
         const status = document.getElementById('members-filter-status');
         const added = document.getElementById('members-filter-added');
-        if (!form) return;
-        const submit = () => (form.requestSubmit ? form.requestSubmit() : form.submit());
-        sort?.addEventListener('change', submit);
-        dept?.addEventListener('change', submit);
-        status?.addEventListener('change', submit);
-        added?.addEventListener('change', submit);
+        if (!form || !window.fetch || !window.DOMParser) return;
+
+        const searchInput = form.querySelector('input[name="search"]');
+        const resultsId = 'members-results';
+
+        let debounceTimer = null;
+        let inflight = null;
+
+        const setBusy = (busy) => {
+            form.setAttribute('aria-busy', busy ? 'true' : 'false');
+            const controls = [searchInput, sort, dept, status, added].filter(Boolean);
+            controls.forEach((el) => {
+                if (el && 'disabled' in el) el.disabled = !!busy;
+            });
+            const wrap = document.getElementById(resultsId);
+            if (wrap) wrap.style.opacity = busy ? '0.65' : '';
+        };
+
+        const syncFormFromUrl = () => {
+            const qs = new URLSearchParams(window.location.search);
+            const setVal = (name, value) => {
+                const el = form.elements.namedItem(name);
+                if (!el) return;
+                if (el instanceof RadioNodeList) return;
+                el.value = value;
+            };
+            setVal('search', qs.get('search') || '');
+            setVal('department', qs.get('department') || '');
+            setVal('status', qs.get('status') || '');
+            setVal('sort', qs.get('sort') || 'name');
+            setVal('added', qs.get('added') || '');
+        };
+
+        const buildUrl = () => {
+            const url = new URL(form.action, window.location.origin);
+            const qs = new URLSearchParams(new FormData(form));
+            for (const [k, v] of Array.from(qs.entries())) {
+                if (String(v).trim() === '') qs.delete(k);
+            }
+            url.search = qs.toString();
+            return url;
+        };
+
+        const renderFromHtml = (html) => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const next = doc.getElementById(resultsId);
+            const cur = document.getElementById(resultsId);
+            if (!next || !cur) return;
+            cur.replaceWith(next);
+        };
+
+        const load = (pushState) => {
+            if (inflight) inflight.abort();
+            inflight = new AbortController();
+            const url = buildUrl();
+            if (pushState) {
+                const nextUrl = url.pathname + (url.search ? ('?' + url.searchParams.toString()) : '');
+                history.pushState(null, '', nextUrl);
+            }
+            setBusy(true);
+            fetch(url.toString(), { signal: inflight.signal, headers: { 'X-Requested-With': 'fetch' } })
+                .then((r) => r.text())
+                .then(renderFromHtml)
+                .catch((e) => {
+                    if (e && e.name === 'AbortError') return;
+                })
+                .finally(() => setBusy(false));
+        };
+
+        const onFilterChange = () => load(true);
+        sort?.addEventListener('change', onFilterChange);
+        dept?.addEventListener('change', onFilterChange);
+        status?.addEventListener('change', onFilterChange);
+        added?.addEventListener('change', onFilterChange);
+
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => load(true), 350);
+            });
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            load(true);
+        });
+
+        window.addEventListener('popstate', () => {
+            syncFormFromUrl();
+            load(false);
+        });
     })();
 </script>
 
-<!-- Members List -->
+<div id="members-results">
 <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
     <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/[0.02] gap-4">
         <div class="flex items-center">
@@ -321,6 +406,7 @@
             </tbody>
         </table>
     </div>
+</div>
 </div>
 
 <!-- Member Details Modal -->
