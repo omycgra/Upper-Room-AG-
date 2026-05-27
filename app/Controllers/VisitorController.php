@@ -326,6 +326,49 @@ class VisitorController extends BaseController {
         exit;
     }
 
+    public function delete()
+    {
+        $this->denyIfDepartmentHead();
+        $this->ensureVisitorSchema();
+
+        if (!Auth::isAdmin()) {
+            Session::flash('error', 'Unauthorized access.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        $visitorId = (int)($_POST['visitor_id'] ?? 0);
+        if ($visitorId <= 0) {
+            Session::flash('error', 'Invalid visitor.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        $visitorModel = new Visitor();
+        $visitor = $visitorModel->findWithAssignee($visitorId);
+        if (!$visitor) {
+            Session::flash('error', 'Visitor not found.');
+            header('Location: ' . BASE_URL . '/visitors');
+            exit;
+        }
+
+        try {
+            $visitorModel->delete($visitorId);
+            AuditLog::log(
+                'Deleted visitor: ' . trim(($visitor['first_name'] ?? '') . ' ' . ($visitor['last_name'] ?? '')),
+                'visitors',
+                $visitorId,
+                $visitor
+            );
+            Session::flash('success', 'Visitor deleted successfully.');
+        } catch (Throwable $e) {
+            Session::flash('error', 'Failed to delete visitor: ' . $e->getMessage());
+        }
+
+        header('Location: ' . BASE_URL . '/visitors');
+        exit;
+    }
+
     private function denyIfDepartmentHead() {
         if (Session::get('user_role') === 'dept_head') {
             Session::flash('error', 'Unauthorized access.');

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/BaseController.php';
 require_once __DIR__ . '/../Models/Attendance.php';
 require_once __DIR__ . '/../Models/Member.php';
+require_once __DIR__ . '/../Models/Department.php';
 
 class AttendanceController extends BaseController {
     public function index() {
@@ -22,6 +23,10 @@ class AttendanceController extends BaseController {
 
         $serviceDate = trim((string)($_GET['service_date'] ?? date('Y-m-d')));
         $serviceType = trim((string)($_GET['service_type'] ?? 'Sunday Service'));
+        $departmentId = (int)($_GET['department_id'] ?? 0);
+        if ($departmentId <= 0) {
+            $departmentId = 0;
+        }
         if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
             $serviceDate = date('Y-m-d');
         }
@@ -30,9 +35,11 @@ class AttendanceController extends BaseController {
         }
         $serviceType = mb_substr($serviceType, 0, 100);
 
-        $dailyReport = $this->buildServiceAttendanceReport($serviceDate, $serviceType);
+        $dailyReport = $this->buildServiceAttendanceReport($serviceDate, $serviceType, $departmentId > 0 ? $departmentId : null);
+        $deptModel = new Department();
+        $departments = $deptModel->all('name ASC');
 
-        $recent = $attendanceModel->getRecentWithMember(50);
+        $recent = $attendanceModel->getRecentWithMemberForServiceDate(date('Y-m-d'), 50);
         foreach ($recent as &$r) {
             $checkInRaw = trim((string)($r['device_time'] ?? ''));
             if ($checkInRaw === '') {
@@ -55,6 +62,8 @@ class AttendanceController extends BaseController {
             'cloud_last_result' => (string)Session::flash('attendance_cloud_last_result'),
             'service_date' => $serviceDate,
             'service_type' => $serviceType,
+            'department_id' => $departmentId,
+            'departments' => $departments,
             'daily_report' => $dailyReport,
             'can_manage_attendance' => Auth::isAdmin(),
             'can_download_attendance' => (Auth::isAdmin() || Auth::isPastor() || Auth::isVisitationTeam()),
@@ -82,6 +91,10 @@ class AttendanceController extends BaseController {
 
         $serviceDate = trim((string)($_GET['service_date'] ?? date('Y-m-d')));
         $serviceType = trim((string)($_GET['service_type'] ?? 'Sunday Service'));
+        $departmentId = (int)($_GET['department_id'] ?? 0);
+        if ($departmentId <= 0) {
+            $departmentId = 0;
+        }
         if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
             $serviceDate = date('Y-m-d');
         }
@@ -90,9 +103,11 @@ class AttendanceController extends BaseController {
         }
         $serviceType = mb_substr($serviceType, 0, 100);
 
-        $dailyReport = $this->buildServiceAttendanceReport($serviceDate, $serviceType);
+        $dailyReport = $this->buildServiceAttendanceReport($serviceDate, $serviceType, $departmentId > 0 ? $departmentId : null);
+        $deptModel = new Department();
+        $departments = $deptModel->all('name ASC');
 
-        $recent = $attendanceModel->getRecentWithMember(50);
+        $recent = $attendanceModel->getRecentWithMemberForServiceDate(date('Y-m-d'), 50);
         foreach ($recent as &$r) {
             $checkInRaw = trim((string)($r['device_time'] ?? ''));
             if ($checkInRaw === '') {
@@ -115,10 +130,69 @@ class AttendanceController extends BaseController {
             'cloud_last_result' => '',
             'service_date' => $serviceDate,
             'service_type' => $serviceType,
+            'department_id' => $departmentId,
+            'departments' => $departments,
             'daily_report' => $dailyReport,
             'can_manage_attendance' => false,
             'can_download_attendance' => true,
             'attendance_page_route' => 'attendance/view'
+        ]);
+    }
+
+    public function department()
+    {
+        if (!Auth::isDepartmentHead()) {
+            Session::flash('error', 'Unauthorized access.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/dashboard");
+            exit;
+        }
+
+        $myDeptId = (int)(Session::get('user_department_id') ?? 0);
+        if ($myDeptId <= 0) {
+            Session::flash('error', 'Department access is not configured for this account.');
+            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+            header("Location: $base/dashboard");
+            exit;
+        }
+
+        $this->ensureAttendanceSchema();
+        $attendanceModel = new Attendance();
+
+        $serviceDate = trim((string)($_GET['service_date'] ?? date('Y-m-d')));
+        $serviceType = trim((string)($_GET['service_type'] ?? 'Sunday Service'));
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            $serviceDate = date('Y-m-d');
+        }
+        if ($serviceType === '') {
+            $serviceType = 'Sunday Service';
+        }
+        $serviceType = mb_substr($serviceType, 0, 100);
+
+        $deptModel = new Department();
+        $departments = $deptModel->all('name ASC');
+        $dailyReport = $this->buildServiceAttendanceReport($serviceDate, $serviceType, $myDeptId);
+
+        View::render('attendance.index', [
+            'title' => 'Attendance',
+            'attendance_rate' => $attendanceModel->getAttendanceRate(),
+            'recent_records' => [],
+            'attendance_mode' => $this->getAttendanceMode(),
+            'biotime_configured' => false,
+            'biotime_url' => '',
+            'cloud_configured' => false,
+            'cloud_url' => '',
+            'cloud_last_pushed_at' => '',
+            'cloud_last_result' => '',
+            'service_date' => $serviceDate,
+            'service_type' => $serviceType,
+            'department_id' => $myDeptId,
+            'departments' => $departments,
+            'daily_report' => $dailyReport,
+            'can_manage_attendance' => false,
+            'can_download_attendance' => true,
+            'attendance_page_route' => 'attendance/department',
+            'service_only' => true
         ]);
     }
 
@@ -136,10 +210,53 @@ class AttendanceController extends BaseController {
             exit;
         }
         $this->ensureAttendanceSchema();
-        $memberModel = new Member();
+        $db = Database::getInstance();
+        $deptModel = new Department();
+        $departments = $deptModel->all('name ASC');
+        $departmentId = (int)($_GET['department_id'] ?? 0);
+        if ($departmentId <= 0) {
+            $departmentId = 0;
+        }
+
+        $hasMemberDepartments = $db->tableExists('member_departments');
+        $sql = "SELECT
+                    m.id,
+                    m.member_code,
+                    m.bio_id,
+                    m.photo_path,
+                    m.first_name,
+                    m.last_name,
+                    d.name AS department_name
+                FROM members m
+                LEFT JOIN departments d ON m.department_id = d.id
+                WHERE 1=1";
+        $params = [];
+        if ($departmentId > 0) {
+            if ($hasMemberDepartments) {
+                $sql .= " AND (
+                            m.department_id = ?
+                            OR EXISTS (
+                                SELECT 1
+                                FROM member_departments md
+                                WHERE md.member_id = m.id
+                                  AND md.department_id = ?
+                            )
+                        )";
+                $params[] = $departmentId;
+                $params[] = $departmentId;
+            } else {
+                $sql .= " AND m.department_id = ?";
+                $params[] = $departmentId;
+            }
+        }
+        $sql .= " ORDER BY m.first_name ASC, m.last_name ASC";
+        $members = $db->fetchAll($sql, $params) ?: [];
+        $members = $this->attachDepartmentNames($members);
         View::render('attendance.mark', [
             'title' => 'Mark Attendance',
-            'members' => $memberModel->all('first_name ASC')
+            'members' => $members,
+            'departments' => $departments,
+            'department_id' => $departmentId
         ]);
     }
 
@@ -547,7 +664,7 @@ class AttendanceController extends BaseController {
 
     public function download()
     {
-        if (!Auth::isAdmin() && !Auth::isPastor() && !Auth::isVisitationTeam()) {
+        if (!Auth::isAdmin() && !Auth::isPastor() && !Auth::isVisitationTeam() && !Auth::isDepartmentHead()) {
             Session::flash('error', 'Unauthorized access.');
             $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
             header("Location: $base/attendance");
@@ -556,6 +673,20 @@ class AttendanceController extends BaseController {
 
         $serviceDate = trim((string)($_GET['service_date'] ?? ''));
         $serviceType = trim((string)($_GET['service_type'] ?? ''));
+        $departmentId = (int)($_GET['department_id'] ?? 0);
+        if ($departmentId <= 0) {
+            $departmentId = 0;
+        }
+        if (Auth::isDepartmentHead() && !Auth::isAdmin()) {
+            $myDeptId = (int)(Session::get('user_department_id') ?? 0);
+            if ($myDeptId <= 0) {
+                Session::flash('error', 'Department access is not configured for this account.');
+                $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+                header("Location: $base/dashboard");
+                exit;
+            }
+            $departmentId = $myDeptId;
+        }
         $statusFilter = strtolower(trim((string)($_GET['status'] ?? 'all')));
         if (!in_array($statusFilter, ['all', 'present', 'late', 'absent'], true)) {
             $statusFilter = 'all';
@@ -575,10 +706,11 @@ class AttendanceController extends BaseController {
         $serviceType = mb_substr($serviceType, 0, 100);
 
         $this->ensureAttendanceSchema();
-        $report = $this->buildServiceAttendanceReport($serviceDate, $serviceType);
+        $report = $this->buildServiceAttendanceReport($serviceDate, $serviceType, $departmentId > 0 ? $departmentId : null);
         $rows = $report['rows'] ?? [];
 
-        $filename = 'attendance_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', strtolower($serviceType)) . '_' . $serviceDate . '_' . $statusFilter . '_' . date('His') . '.csv';
+        $deptPart = $departmentId > 0 ? ('dept_' . $departmentId . '_') : '';
+        $filename = 'attendance_' . $deptPart . preg_replace('/[^a-zA-Z0-9_-]+/', '_', strtolower($serviceType)) . '_' . $serviceDate . '_' . $statusFilter . '_' . date('His') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
 
@@ -875,26 +1007,48 @@ class AttendanceController extends BaseController {
         return 'Present';
     }
 
-    private function buildServiceAttendanceReport(string $serviceDate, string $serviceType): array
+    private function buildServiceAttendanceReport(string $serviceDate, string $serviceType, ?int $departmentId = null): array
     {
         $db = Database::getInstance();
-        $members = $db->fetchAll(
-            "SELECT m.id,
-                    m.member_code,
-                    m.bio_id,
-                    m.first_name,
-                    m.last_name,
-                    m.gender,
-                    m.stays_at,
-                    m.address,
-                    m.phone,
-                    d.name AS department_name,
-                    c.name AS group_name
-             FROM members m
-             LEFT JOIN departments d ON m.department_id = d.id
-             LEFT JOIN clusters c ON m.cluster_id = c.id
-             ORDER BY m.last_name ASC, m.first_name ASC"
-        ) ?: [];
+        $hasMemberDepartments = $db->tableExists('member_departments');
+        $sql = "SELECT m.id,
+                       m.member_code,
+                       m.bio_id,
+                       m.photo_path,
+                       m.first_name,
+                       m.last_name,
+                       m.gender,
+                       m.stays_at,
+                       m.address,
+                       m.phone,
+                       d.name AS department_name,
+                       c.name AS group_name
+                FROM members m
+                LEFT JOIN departments d ON m.department_id = d.id
+                LEFT JOIN clusters c ON m.cluster_id = c.id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($departmentId) && (int)$departmentId > 0) {
+            if ($hasMemberDepartments) {
+                $sql .= " AND (
+                            m.department_id = ?
+                            OR EXISTS (
+                                SELECT 1
+                                FROM member_departments md
+                                WHERE md.member_id = m.id
+                                  AND md.department_id = ?
+                            )
+                        )";
+                $params[] = (int)$departmentId;
+                $params[] = (int)$departmentId;
+            } else {
+                $sql .= " AND m.department_id = ?";
+                $params[] = (int)$departmentId;
+            }
+        }
+        $sql .= " ORDER BY m.last_name ASC, m.first_name ASC";
+        $members = $db->fetchAll($sql, $params) ?: [];
+        $members = $this->attachDepartmentNames($members);
         if (empty($members)) {
             return [
                 'service_date' => $serviceDate,
@@ -968,6 +1122,75 @@ class AttendanceController extends BaseController {
             ],
             'rows' => $rows
         ];
+    }
+
+    private function attachDepartmentNames(array $members): array
+    {
+        if (empty($members)) {
+            return $members;
+        }
+
+        $db = Database::getInstance();
+        if (!$db->tableExists('member_departments')) {
+            return $members;
+        }
+
+        $memberIds = [];
+        foreach ($members as $m) {
+            $id = (int)($m['id'] ?? 0);
+            if ($id > 0) {
+                $memberIds[] = $id;
+            }
+        }
+        $memberIds = array_values(array_unique($memberIds));
+        if (empty($memberIds)) {
+            return $members;
+        }
+
+        $extraByMember = [];
+        foreach (array_chunk($memberIds, 500) as $chunk) {
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+            $rows = $db->fetchAll(
+                "SELECT md.member_id, d.name as department_name
+                 FROM member_departments md
+                 INNER JOIN departments d ON d.id = md.department_id
+                 WHERE md.member_id IN ($placeholders)
+                 ORDER BY md.member_id ASC, d.name ASC",
+                $chunk
+            ) ?: [];
+            foreach ($rows as $r) {
+                $mid = (int)($r['member_id'] ?? 0);
+                $name = trim((string)($r['department_name'] ?? ''));
+                if ($mid <= 0 || $name === '') {
+                    continue;
+                }
+                if (!isset($extraByMember[$mid])) {
+                    $extraByMember[$mid] = [];
+                }
+                $extraByMember[$mid][] = $name;
+            }
+        }
+
+        foreach ($members as &$m) {
+            $mid = (int)($m['id'] ?? 0);
+            $primary = trim((string)($m['department_name'] ?? ''));
+            $names = [];
+            if ($primary !== '') {
+                $names[] = $primary;
+            }
+            if ($mid > 0 && !empty($extraByMember[$mid])) {
+                foreach ($extraByMember[$mid] as $n) {
+                    $names[] = $n;
+                }
+            }
+            $names = array_values(array_unique(array_filter(array_map('trim', $names))));
+            if (!empty($names)) {
+                $m['department_name'] = implode(', ', $names);
+            }
+        }
+        unset($m);
+
+        return $members;
     }
 
     private function getAttendanceMode(): string

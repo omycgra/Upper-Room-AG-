@@ -1,5 +1,8 @@
 <?php
     $churchName = AppConfig::getSetting('church_name', 'Church Management');
+    $departments = is_array($departments ?? null) ? $departments : [];
+    $selectedDeptId = (int)($department_id ?? 0);
+    if ($selectedDeptId <= 0) $selectedDeptId = 0;
 ?>
 
 <div class="flex flex-col sm:flex-row justify-between items-start mb-10 gap-4">
@@ -28,6 +31,31 @@
         <span class="px-4 py-2 text-[9px] font-black rounded-full uppercase tracking-widest border bg-white/5 text-slate-300 border-white/10 shrink-0">
             <?php echo count($members ?? []); ?> members
         </span>
+    </div>
+
+    <div class="p-6 sm:p-8 lg:p-10 border-b border-white/5 bg-slate-900/30">
+        <form method="GET" action="<?php echo BASE_URL; ?>/attendance/mark" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div class="md:col-span-3 space-y-2">
+                <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Filter By Department</label>
+                <div class="relative group">
+                    <i class="fas fa-sitemap absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                    <select name="department_id" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-4 text-xs font-black text-slate-200 transition-all outline-none appearance-none cursor-pointer">
+                        <option value="">All Departments</option>
+                        <?php foreach ($departments as $d): ?>
+                            <option value="<?php echo (int)($d['id'] ?? 0); ?>" <?php echo ((int)($d['id'] ?? 0) === $selectedDeptId) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars((string)($d['name'] ?? '')); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
+                </div>
+            </div>
+            <div class="flex justify-start md:justify-end">
+                <button type="submit" class="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 inline-flex items-center justify-center">
+                    <i class="fas fa-filter text-[12px] mr-2"></i> Apply
+                </button>
+            </div>
+        </form>
     </div>
 
     <form action="<?php echo BASE_URL; ?>/attendance/store" method="POST" class="p-6 sm:p-8 lg:p-10 space-y-8">
@@ -74,6 +102,7 @@
                             <th class="px-6 py-4 w-14"></th>
                             <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Member</th>
                             <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Code</th>
+                            <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Department</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-white/5">
@@ -81,6 +110,7 @@
                             <?php
                                 $name = trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? ''));
                                 $code = trim((string)($member['member_code'] ?? ''));
+                                $deptName = trim((string)($member['department_name'] ?? ''));
                                 $photoUrl = Branding::mediaUrl((string)($member['photo_path'] ?? ''));
                                 $firstInitial = mb_substr(trim((string)($member['first_name'] ?? '')), 0, 1);
                                 $lastInitial = mb_substr(trim((string)($member['last_name'] ?? '')), 0, 1);
@@ -104,6 +134,7 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($code !== '' ? $code : '—'); ?></td>
+                                <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($deptName !== '' ? $deptName : '—'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

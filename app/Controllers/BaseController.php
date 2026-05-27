@@ -85,6 +85,8 @@ class BaseController {
                 'transactions/download',
                 'department-savings',
                 'department-savings/download',
+                'attendance/department',
+                'attendance/download',
                 'finance/memberSummary',
                 'finance/memberTransactions',
                 'finance/requestDepartmentExpense',

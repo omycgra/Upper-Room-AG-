@@ -127,6 +127,14 @@
                                             <?php echo $isApproved ? 'Reassign' : 'Assign'; ?>
                                         </button>
                                     <?php endif; ?>
+                                    <?php if ($isAdmin): ?>
+                                        <form action="<?php echo BASE_URL; ?>/visitors/delete" method="POST" data-loader="top" onsubmit="return confirm('Delete this visitor record? This cannot be undone.');">
+                                            <input type="hidden" name="visitor_id" value="<?php echo (int)$visitor['id']; ?>">
+                                            <button type="submit" class="inline-flex h-10 items-center justify-center rounded-xl bg-red-500/15 text-red-200 font-black text-[10px] uppercase tracking-widest border border-red-400/20 px-4">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -231,6 +239,14 @@
                                                     class="h-9 px-4 rounded-xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest">
                                                     <?php echo $isApproved ? 'Reassign' : 'Assign'; ?>
                                                 </button>
+                                            <?php endif; ?>
+                                            <?php if ($isAdmin): ?>
+                                                <form action="<?php echo BASE_URL; ?>/visitors/delete" method="POST" data-loader="top" onsubmit="return confirm('Delete this visitor record? This cannot be undone.');">
+                                                    <input type="hidden" name="visitor_id" value="<?php echo (int)$visitor['id']; ?>">
+                                                    <button type="submit" class="h-9 px-4 rounded-xl bg-red-500/15 text-red-200 font-black text-[10px] uppercase tracking-widest border border-red-400/20">
+                                                        Delete
+                                                    </button>
+                                                </form>
                                             <?php endif; ?>
                                         </div>
                                     <?php endif; ?>

@@ -34,8 +34,10 @@ class Router {
         $this->add('visitors/approve', 'VisitorController@approve');
         $this->add('visitors/details', 'VisitorController@details');
         $this->add('visitors/assign', 'VisitorController@assign');
+        $this->add('visitors/delete', 'VisitorController@delete');
         $this->add('attendance', 'AttendanceController@index');
         $this->add('attendance/view', 'AttendanceController@view');
+        $this->add('attendance/department', 'AttendanceController@department');
         $this->add('attendance/mark', 'AttendanceController@mark');
         $this->add('attendance/store', 'AttendanceController@store');
         $this->add('attendance/syncBioTime', 'AttendanceController@syncBioTime');

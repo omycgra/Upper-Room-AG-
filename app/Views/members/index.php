@@ -227,15 +227,46 @@
         added?.addEventListener('change', onFilterChange);
 
         if (searchInput) {
-            const scheduleSearch = (delayMs) => {
-                if (debounceTimer) clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    load(true);
-                }, delayMs);
+            const countEls = () => Array.from(document.querySelectorAll('[data-members-count]'));
+            const memberEls = () => Array.from(document.querySelectorAll('[data-member-search]'));
+
+            const setCount = (n) => {
+                countEls().forEach((el) => {
+                    el.textContent = `${n} Records Found`;
+                });
             };
 
-            searchInput.addEventListener('input', () => scheduleSearch(220));
-            searchInput.addEventListener('blur', () => scheduleSearch(0));
+            const applyClientFilter = (raw) => {
+                const q = String(raw || '').trim().toLowerCase();
+                const tokens = q === '' ? [] : q.split(/\s+/).filter(Boolean);
+                let visibleCount = 0;
+
+                memberEls().forEach((el) => {
+                    const hay = String(el.getAttribute('data-member-search') || '');
+                    const ok = tokens.length === 0 ? true : tokens.every((t) => hay.includes(t));
+                    if (ok) el.classList.remove('hidden');
+                    else el.classList.add('hidden');
+                    if (ok && el.offsetParent !== null) visibleCount++;
+                });
+
+                setCount(visibleCount);
+            };
+
+            const replaceUrlSearch = (value) => {
+                const url = new URL(window.location.href);
+                if (String(value || '').trim() === '') url.searchParams.delete('search');
+                else url.searchParams.set('search', String(value));
+                history.replaceState(null, '', url.pathname + (url.search ? ('?' + url.searchParams.toString()) : ''));
+            };
+
+            searchInput.addEventListener('input', () => {
+                applyClientFilter(searchInput.value);
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => replaceUrlSearch(searchInput.value), 150);
+            });
+
+            window.addEventListener('pageshow', () => applyClientFilter(searchInput.value));
+            applyClientFilter(searchInput.value);
         }
 
         form.addEventListener('submit', (e) => {
@@ -260,7 +291,7 @@
             <h4 class="text-xl font-black text-white tracking-tight">Active Members</h4>
         </div>
         <div class="flex items-center gap-6">
-            <span class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic"><?php echo count($members); ?> Records Found</span>
+            <span data-members-count="1" class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic"><?php echo count($members); ?> Records Found</span>
         </div>
     </div>
     <div class="md:hidden p-4 sm:p-6 space-y-4">
@@ -275,8 +306,18 @@
             <?php foreach ($members as $member): ?>
                 <?php
                     $memberPhotoUrl = Branding::mediaUrl((string)($member['photo_path'] ?? ''));
+                    $memberSearchKey = strtolower(trim(
+                        (string)($member['first_name'] ?? '') . ' ' .
+                        (string)($member['last_name'] ?? '') . ' ' .
+                        (string)($member['member_code'] ?? '') . ' ' .
+                        (string)($member['bio_id'] ?? '') . ' ' .
+                        (string)($member['phone'] ?? '') . ' ' .
+                        (string)($member['email'] ?? '') . ' ' .
+                        (string)($member['department_names'] ?? '') . ' ' .
+                        (string)($member['nationality'] ?? '')
+                    ));
                 ?>
-                <div class="glass-card rounded-[2rem] p-4 sm:p-5 border-white/10">
+                <div class="glass-card rounded-[2rem] p-4 sm:p-5 border-white/10" data-member-search="<?php echo htmlspecialchars($memberSearchKey); ?>">
                     <div class="flex items-start gap-4">
                         <div class="relative flex-shrink-0">
                             <?php if ($memberPhotoUrl !== ''): ?>
@@ -355,8 +396,18 @@
                     <?php foreach ($members as $member): ?>
                         <?php
                             $memberPhotoUrl = Branding::mediaUrl((string)($member['photo_path'] ?? ''));
+                            $memberSearchKey = strtolower(trim(
+                                (string)($member['first_name'] ?? '') . ' ' .
+                                (string)($member['last_name'] ?? '') . ' ' .
+                                (string)($member['member_code'] ?? '') . ' ' .
+                                (string)($member['bio_id'] ?? '') . ' ' .
+                                (string)($member['phone'] ?? '') . ' ' .
+                                (string)($member['email'] ?? '') . ' ' .
+                                (string)($member['department_names'] ?? '') . ' ' .
+                                (string)($member['nationality'] ?? '')
+                            ));
                         ?>
-                        <tr class="hover:bg-white/[0.03] transition-all duration-300 group">
+                        <tr class="hover:bg-white/[0.03] transition-all duration-300 group" data-member-search="<?php echo htmlspecialchars($memberSearchKey); ?>">
                             <td class="px-10 py-6">
                                 <div class="flex items-center">
                                     <div class="relative flex-shrink-0">

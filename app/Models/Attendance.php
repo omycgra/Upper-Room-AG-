@@ -15,11 +15,39 @@ class Attendance extends BaseModel {
                     m.first_name,
                     m.last_name,
                     m.member_code,
-                    m.bio_id
+                    m.bio_id,
+                    m.photo_path
              FROM attendance a
              LEFT JOIN members m ON a.member_id = m.id
              ORDER BY a.service_date DESC, a.id DESC
              LIMIT $limit"
+        ) ?: [];
+    }
+
+    public function getRecentWithMemberForServiceDate(string $serviceDate, int $limit = 50): array
+    {
+        $serviceDate = trim($serviceDate);
+        if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
+            return [];
+        }
+
+        $limit = (int)$limit;
+        if ($limit <= 0) $limit = 50;
+        if ($limit > 500) $limit = 500;
+
+        return $this->db->fetchAll(
+            "SELECT a.*,
+                    m.first_name,
+                    m.last_name,
+                    m.member_code,
+                    m.bio_id,
+                    m.photo_path
+             FROM attendance a
+             LEFT JOIN members m ON a.member_id = m.id
+             WHERE a.service_date = ?
+             ORDER BY a.id DESC
+             LIMIT $limit",
+            [$serviceDate]
         ) ?: [];
     }
 

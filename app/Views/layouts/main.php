@@ -1095,6 +1095,14 @@
                             </a>
                         </li>
                     <?php endif; ?>
+                    <?php if ($isDeptHead): ?>
+                        <li>
+                            <a href="<?php echo BASE_URL; ?>/attendance/department" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'attendance') === 0 ? 'active-link' : 'text-slate-400'; ?>">
+                                <i class="fas fa-check-square w-6 text-sm"></i>
+                                <span class="ml-3 text-sm font-bold">Attendance</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
                     <?php if ($isPastor || $isVisitationTeam): ?>
                         <li>
                             <a href="<?php echo BASE_URL; ?>/attendance/view" class="flex items-center px-5 py-3.5 rounded-2xl nav-item-hover transition-all duration-300 <?php echo strpos($current_route, 'attendance') === 0 ? 'active-link' : 'text-slate-400'; ?>">

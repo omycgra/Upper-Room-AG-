@@ -10,6 +10,19 @@
     if ($pageRoute === '') $pageRoute = 'attendance';
     $dailyDate = (string)($service_date ?? date('Y-m-d'));
     $dailyType = (string)($service_type ?? 'Sunday Service');
+    $departments = is_array($departments ?? null) ? $departments : [];
+    $selectedDeptId = (int)($department_id ?? 0);
+    if ($selectedDeptId <= 0) $selectedDeptId = 0;
+    $serviceOnly = !empty($service_only);
+    $selectedDeptName = '';
+    if ($selectedDeptId > 0) {
+        foreach ($departments as $d) {
+            if ((int)($d['id'] ?? 0) === $selectedDeptId) {
+                $selectedDeptName = (string)($d['name'] ?? '');
+                break;
+            }
+        }
+    }
     $dailyReport = is_array($daily_report ?? null) ? $daily_report : [];
     $dailyCounts = is_array($dailyReport['counts'] ?? null) ? $dailyReport['counts'] : ['present' => 0, 'late' => 0, 'absent' => 0, 'total' => 0];
     $dailyRows = is_array($dailyReport['rows'] ?? null) ? $dailyReport['rows'] : [];
@@ -37,6 +50,7 @@
     </div>
 </div>
 
+<?php if (!$serviceOnly): ?>
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-8">
     <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 border-white/5 card-interaction">
         <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Avg. Attendance Rate</p>
@@ -268,7 +282,9 @@
         </div>
     </div>
 </div>
+<?php endif; ?>
 
+<?php if (!$serviceOnly): ?>
 <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
     <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex items-center justify-between gap-4 bg-white/[0.02]">
         <div class="flex items-center">
@@ -305,14 +321,33 @@
                             $bio = trim((string)($record['bio_id'] ?? ''));
                             $source = strtolower(trim((string)($record['source'] ?? 'manual')));
                             $deviceTime = trim((string)($record['device_time'] ?? ''));
+                            $photoUrl = Branding::mediaUrl((string)($record['photo_path'] ?? ''));
+                            $firstInitial = mb_substr(trim((string)($record['first_name'] ?? '')), 0, 1);
+                            $lastInitial = mb_substr(trim((string)($record['last_name'] ?? '')), 0, 1);
+                            $initials = trim(strtoupper($firstInitial . $lastInitial));
+                            if ($initials === '') $initials = '—';
                         ?>
                         <tr class="hover:bg-white/[0.03]">
                             <td class="px-6 py-4 text-sm font-bold text-slate-200"><?php echo !empty($record['service_date']) ? htmlspecialchars(date('M d, Y', strtotime((string)$record['service_date']))) : 'N/A'; ?></td>
                             <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars((string)($record['service_type'] ?? '')); ?></td>
                             <td class="px-6 py-4">
-                                <div class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($name !== '' ? $name : ('#' . (int)($record['member_id'] ?? 0))); ?></div>
+                                <div class="flex items-center gap-3">
+                                    <?php if (trim($photoUrl) !== ''): ?>
+                                        <img src="<?php echo htmlspecialchars($photoUrl); ?>" alt="" class="w-9 h-9 rounded-full object-cover border border-white/10 bg-white/5">
+                                    <?php else: ?>
+                                        <div class="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black text-slate-300">
+                                            <?php echo htmlspecialchars($initials); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div>
+                                        <div class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($name !== '' ? $name : ('#' . (int)($record['member_id'] ?? 0))); ?></div>
+                                        <?php if ($code !== ''): ?>
+                                            <div class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1"><?php echo htmlspecialchars($code); ?></div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
                                 <?php if ($code !== ''): ?>
-                                    <div class="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1"><?php echo htmlspecialchars($code); ?></div>
+                                    <div class="hidden"></div>
                                 <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($bio !== '' ? $bio : '—'); ?></td>
@@ -338,6 +373,7 @@
         </table>
     </div>
 </div>
+<?php endif; ?>
 
 <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction mb-8">
     <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white/[0.02]">
@@ -347,7 +383,12 @@
             </div>
             <div>
                 <h4 class="text-xl font-black text-white tracking-tight">Service Attendance</h4>
-                <p class="text-slate-500 font-black mt-2 uppercase tracking-widest text-[10px]">Present (7:00–10:30) • Late (10:31–12:00) • Absent (after 12:00)</p>
+                    <p class="text-slate-500 font-black mt-2 uppercase tracking-widest text-[10px]">
+                        Present (7:00–10:30) • Late (10:31–12:00) • Absent (after 12:00)
+                        <?php if ($selectedDeptId > 0): ?>
+                            • Department: <span class="text-slate-300"><?php echo htmlspecialchars($selectedDeptName !== '' ? $selectedDeptName : ('#' . $selectedDeptId)); ?></span>
+                        <?php endif; ?>
+                    </p>
             </div>
         </div>
         <?php if ($canDownload): ?>
@@ -358,14 +399,14 @@
                     <option value="late">Late</option>
                     <option value="absent">Absent</option>
                 </select>
-                <a id="att-download-btn" href="<?php echo BASE_URL; ?>/attendance/download?<?php echo http_build_query(['service_date' => $dailyDate, 'service_type' => $dailyType, 'status' => 'all']); ?>" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow inline-flex items-center justify-center">
+                <a id="att-download-btn" href="<?php echo BASE_URL; ?>/attendance/download?<?php echo http_build_query(array_filter(['service_date' => $dailyDate, 'service_type' => $dailyType, 'status' => 'all', 'department_id' => $selectedDeptId > 0 ? $selectedDeptId : null], function ($v) { return $v !== null && $v !== ''; })); ?>" class="h-12 px-6 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-widest hover-glow-yellow inline-flex items-center justify-center">
                     <i class="fas fa-download text-[12px] mr-2"></i> Download CSV
                 </a>
             </div>
         <?php endif; ?>
     </div>
     <div class="p-6 sm:p-8 lg:p-10 space-y-8">
-        <form method="GET" action="<?php echo BASE_URL; ?>/<?php echo htmlspecialchars($pageRoute); ?>" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <form method="GET" action="<?php echo BASE_URL; ?>/<?php echo htmlspecialchars($pageRoute); ?>" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div class="space-y-2">
                 <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Date</label>
                 <input type="date" name="service_date" required value="<?php echo htmlspecialchars($dailyDate); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none">
@@ -378,6 +419,27 @@
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php if (!$serviceOnly): ?>
+                <div class="space-y-2">
+                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Department</label>
+                    <select name="department_id" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-5 py-4 text-xs font-black text-slate-200 transition-all outline-none appearance-none cursor-pointer">
+                        <option value="">All Departments</option>
+                        <?php foreach ($departments as $d): ?>
+                            <option value="<?php echo (int)($d['id'] ?? 0); ?>" <?php echo ((int)($d['id'] ?? 0) === $selectedDeptId) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars((string)($d['name'] ?? '')); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            <?php else: ?>
+                <input type="hidden" name="department_id" value="<?php echo (int)$selectedDeptId; ?>">
+                <div class="space-y-2">
+                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Department</label>
+                    <div class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-xs font-black text-slate-200">
+                        <?php echo htmlspecialchars($selectedDeptName !== '' ? $selectedDeptName : ('#' . $selectedDeptId)); ?>
+                    </div>
+                </div>
+            <?php endif; ?>
             <div class="flex justify-start md:justify-end">
                 <button type="submit" class="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-slate-200 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 inline-flex items-center justify-center">
                     <i class="fas fa-search text-[12px] mr-2"></i> View
@@ -418,6 +480,7 @@
                         <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Member</th>
                         <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Code</th>
                         <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Bio ID</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Department</th>
                         <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Check-in</th>
                         <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Source</th>
                         <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
@@ -426,7 +489,7 @@
                 <tbody class="divide-y divide-white/10" id="att-rows">
                     <?php if (empty($dailyRows)): ?>
                         <tr>
-                            <td colspan="6" class="px-6 py-10 text-center text-slate-500 font-bold">No members found.</td>
+                            <td colspan="7" class="px-6 py-10 text-center text-slate-500 font-bold">No members found.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($dailyRows as $row): ?>
@@ -435,17 +498,33 @@
                                 $name = trim((string)($m['first_name'] ?? '') . ' ' . (string)($m['last_name'] ?? ''));
                                 $code = trim((string)($m['member_code'] ?? ''));
                                 $bio = trim((string)($m['bio_id'] ?? ''));
+                                $deptName = trim((string)($m['department_name'] ?? ''));
                                 $source = trim((string)($row['source'] ?? ''));
                                 $checkIn = trim((string)($row['check_in'] ?? ''));
                                 $status = strtolower(trim((string)($row['status'] ?? 'absent')));
                                 if (!in_array($status, ['present', 'late', 'absent'], true)) $status = 'absent';
+                                $photoUrl = Branding::mediaUrl((string)($m['photo_path'] ?? ''));
+                                $firstInitial = mb_substr(trim((string)($m['first_name'] ?? '')), 0, 1);
+                                $lastInitial = mb_substr(trim((string)($m['last_name'] ?? '')), 0, 1);
+                                $initials = trim(strtoupper($firstInitial . $lastInitial));
+                                if ($initials === '') $initials = '—';
                             ?>
                             <tr class="hover:bg-white/[0.03]" data-status="<?php echo htmlspecialchars($status); ?>">
                                 <td class="px-6 py-4">
-                                    <div class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($name !== '' ? $name : ('#' . (int)($m['id'] ?? 0))); ?></div>
+                                    <div class="flex items-center gap-3">
+                                        <?php if (trim($photoUrl) !== ''): ?>
+                                            <img src="<?php echo htmlspecialchars($photoUrl); ?>" alt="" class="w-9 h-9 rounded-full object-cover border border-white/10 bg-white/5">
+                                        <?php else: ?>
+                                            <div class="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black text-slate-300">
+                                                <?php echo htmlspecialchars($initials); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($name !== '' ? $name : ('#' . (int)($m['id'] ?? 0))); ?></div>
+                                    </div>
                                 </td>
                                 <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($code !== '' ? $code : '—'); ?></td>
                                 <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($bio !== '' ? $bio : '—'); ?></td>
+                                <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($deptName !== '' ? $deptName : '—'); ?></td>
                                 <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo $checkIn !== '' ? htmlspecialchars(date('H:i:s', strtotime($checkIn))) : '—'; ?></td>
                                 <td class="px-6 py-4 text-sm font-bold text-slate-300"><?php echo htmlspecialchars($source !== '' ? $source : '—'); ?></td>
                                 <td class="px-6 py-4">
@@ -486,7 +565,7 @@
                 const btn = document.getElementById('att-download-btn');
                 if (!filter || !btn) return;
                 const base = '<?php echo rtrim((string)BASE_URL, '/'); ?>';
-                const qsBase = <?php echo json_encode(['service_date' => $dailyDate, 'service_type' => $dailyType]); ?>;
+                const qsBase = <?php echo json_encode(array_filter(['service_date' => $dailyDate, 'service_type' => $dailyType, 'department_id' => $selectedDeptId > 0 ? $selectedDeptId : null], function ($v) { return $v !== null && $v !== ''; })); ?>;
                 const build = () => {
                     const status = (filter.value || 'all').toLowerCase();
                     const qs = new URLSearchParams(Object.assign({}, qsBase, { status })).toString();
