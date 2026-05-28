@@ -789,6 +789,15 @@
 
                 <div class="space-y-6 pt-4">
                     <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Church Name for SMS (Message Prefix)</label>
+                        <div class="relative group">
+                            <i class="fas fa-church absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <input type="text" name="sms_message_prefix" value="<?php echo htmlspecialchars($smsMessagePrefix ?? ''); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-sm font-bold text-white transition-all outline-none" placeholder="e.g., Upper Room (Leave blank to use Branding name)">
+                        </div>
+                        <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">This name will appear at the very start of every automated SMS</p>
+                    </div>
+
+                    <div class="space-y-3">
                         <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Payment Confirmation SMS Template</label>
                         <div class="relative group">
                             <i class="fas fa-comment-dots absolute left-5 top-6 text-slate-600 group-focus-within:text-accent transition-colors"></i>

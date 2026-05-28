@@ -160,9 +160,14 @@ class FinancePaymentSmsService
 
     private static function buildMessage(array $transaction): string
     {
-        $churchName = trim((string)AppConfig::getSetting('church_name', 'CHURCH'));
-        $churchNameClean = strip_tags(html_entity_decode($churchName, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-        $prefix = (strlen($churchNameClean) > 15) ? substr($churchNameClean, 0, 12) . '...' : $churchNameClean;
+        $customPrefix = trim((string)AppConfig::getSetting('sms_message_prefix', ''));
+        if ($customPrefix !== '') {
+            $prefix = $customPrefix;
+        } else {
+            $churchName = trim((string)AppConfig::getSetting('church_name', 'CHURCH'));
+            $churchNameClean = strip_tags(html_entity_decode($churchName, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $prefix = (strlen($churchNameClean) > 15) ? substr($churchNameClean, 0, 12) . '...' : $churchNameClean;
+        }
         
         $currency = strtoupper(trim((string)AppConfig::getSetting('finance_currency', 'GHS')));
         $amount = number_format((float)($transaction['amount'] ?? 0), 2);

@@ -55,6 +55,7 @@ class SettingController extends BaseController {
         $autoBirthdaySms = AppConfig::getSetting('auto_birthday_sms', '0');
         $smsPaymentTemplate = AppConfig::getSetting('sms_payment_template', '');
         $smsBirthdayTemplate = AppConfig::getSetting('sms_birthday_template', '');
+        $smsMessagePrefix = AppConfig::getSetting('sms_message_prefix', '');
         $attendanceMode = strtolower(trim((string)AppConfig::getSetting('attendance_mode', 'manual')));
         if (!in_array($attendanceMode, ['manual', 'biotime', 'qrcode', 'link'], true)) {
             $attendanceMode = 'manual';
@@ -116,6 +117,7 @@ class SettingController extends BaseController {
             'autoBirthdaySms' => $autoBirthdaySms,
             'smsPaymentTemplate' => $smsPaymentTemplate,
             'smsBirthdayTemplate' => $smsBirthdayTemplate,
+            'smsMessagePrefix' => $smsMessagePrefix,
             'attendanceConfig' => $attendanceConfig,
             'storageConfig' => $storageConfig,
             'dbConfig' => $dbConfig,
@@ -652,6 +654,7 @@ class SettingController extends BaseController {
         $autoBirthdaySms = isset($_POST['auto_birthday_sms']) ? '1' : '0';
         $smsPaymentTemplate = trim((string)($_POST['sms_payment_template'] ?? ''));
         $smsBirthdayTemplate = trim((string)($_POST['sms_birthday_template'] ?? ''));
+        $smsMessagePrefix = trim((string)($_POST['sms_message_prefix'] ?? ''));
 
         if ($senderId !== '') {
             $senderId = preg_replace('/\s+/', ' ', $senderId);
@@ -689,6 +692,7 @@ class SettingController extends BaseController {
             $this->upsertSetting($db, 'auto_birthday_sms', $autoBirthdaySms);
             $this->upsertSetting($db, 'sms_payment_template', $smsPaymentTemplate);
             $this->upsertSetting($db, 'sms_birthday_template', $smsBirthdayTemplate);
+            $this->upsertSetting($db, 'sms_message_prefix', $smsMessagePrefix);
 
             AuditLog::log("Updated SMS configuration", "settings");
             Session::flash('success', 'SMS configuration updated successfully');
