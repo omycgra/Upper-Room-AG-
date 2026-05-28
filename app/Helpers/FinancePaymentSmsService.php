@@ -4,7 +4,7 @@ require_once __DIR__ . '/SmsService.php';
 
 class FinancePaymentSmsService
 {
-    private const ELIGIBLE_TYPES = ['tithe', 'welfare'];
+    private const ELIGIBLE_TYPES = ['tithe', 'welfare', 'offering'];
 
     public static function sendForTransaction(int $financeId): array
     {
@@ -124,17 +124,32 @@ class FinancePaymentSmsService
         $raw = trim($raw);
         if ($raw === '') return [];
 
+        // First, try to find numbers in the raw string by removing common separators but keeping a sense of groups
+        $clean = preg_replace('/[^\d+]/', '', $raw);
+        
         $found = [];
-        if (preg_match_all('/(\+233|233|0)\d{9}|\b\d{9}\b/', $raw, $m)) {
+        // Match Ghana formats: +233..., 233..., 0... (10 digits)
+        if (preg_match_all('/(\+233|233|0)\d{9}/', $clean, $m)) {
             foreach (($m[0] ?? []) as $v) {
                 $v = trim((string)$v);
                 if ($v !== '') $found[] = $v;
             }
         }
+
+        // If nothing found, try simpler 9-digit match (without leading 0)
+        if (empty($found)) {
+            if (preg_match_all('/\b\d{9}\b/', $clean, $m)) {
+                foreach (($m[0] ?? []) as $v) {
+                    $found[] = '233' . $v;
+                }
+            }
+        }
+
+        // Final fallback: original logic for split strings
         if (empty($found)) {
             $parts = preg_split('/[,\s\/;|]+/', $raw) ?: [];
             foreach ($parts as $p) {
-                $p = trim((string)$p);
+                $p = preg_replace('/[^\d+]/', '', $p);
                 if ($p !== '') $found[] = $p;
             }
         }
@@ -145,39 +160,32 @@ class FinancePaymentSmsService
 
     private static function buildMessage(array $transaction): string
     {
-        $churchName = trim((string)AppConfig::getSetting('church_name', 'YOUR CHURCH'));
+        $churchName = trim((string)AppConfig::getSetting('church_name', 'CHURCH'));
+        $churchNameClean = strip_tags(html_entity_decode($churchName, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $prefix = (strlen($churchNameClean) > 15) ? substr($churchNameClean, 0, 12) . '...' : $churchNameClean;
+        
         $currency = strtoupper(trim((string)AppConfig::getSetting('finance_currency', 'GHS')));
         $amount = number_format((float)($transaction['amount'] ?? 0), 2);
-        $name = trim((string)(($transaction['first_name'] ?? '') . ' ' . ($transaction['last_name'] ?? '')));
-        if ($name === '') $name = 'MEMBER';
-        $type = strtoupper(trim((string)($transaction['transaction_type'] ?? 'PAYMENT')));
-        $transactionNumber = trim((string)($transaction['transaction_number'] ?? ''));
-        $date = trim((string)($transaction['transaction_date'] ?? ''));
-        $paymentMethod = trim((string)($transaction['payment_method'] ?? ''));
-        $receivedBy = trim((string)($transaction['received_by_name'] ?? ''));
-
-        $parts = [
-            'Dear ' . $name . ',',
-            'we have received your ' . $type . ' payment of ' . $currency . ' ' . $amount . '.'
-        ];
-
-        if ($receivedBy !== '') {
-            $label = (strtolower($paymentMethod) === 'cash') ? 'Cash received by' : 'Received by';
-            $parts[] = $label . ': ' . $receivedBy . '.';
+        
+        $firstName = trim((string)($transaction['first_name'] ?? ''));
+        $lastName = trim((string)($transaction['last_name'] ?? ''));
+        $name = $firstName !== '' ? $firstName : ($lastName !== '' ? $lastName : 'Member');
+        $nameClean = strip_tags(html_entity_decode($name, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        
+        $typeRaw = trim((string)($transaction['transaction_type'] ?? 'contribution'));
+        $type = ucfirst(strtolower($typeRaw));
+        
+        $template = trim((string)AppConfig::getSetting('sms_payment_template', ''));
+        if ($template === '') {
+            // Default template
+            return "{$prefix}: Hi {$nameClean}, thank you for your {$type} contribution of {$currency} {$amount}. We appreciate your support. God bless you.";
         }
 
-        if ($date !== '') {
-            $parts[] = 'Date: ' . $date . '.';
-        }
-
-        if ($transactionNumber !== '') {
-            $parts[] = 'Transaction No: ' . $transactionNumber . '.';
-        }
-
-        $parts[] = 'Thank you for your faithfulness.';
-        $parts[] = $churchName . '.';
-
-        return implode(' ', $parts);
+        // Parse template
+        $search = ['{church_name}', '{name}', '{type}', '{currency}', '{amount}'];
+        $replace = [$prefix, $nameClean, $type, $currency, $amount];
+        
+        return trim(str_replace($search, $replace, $template));
     }
 
     private static function ensureSmsLogTable(Database $db): void

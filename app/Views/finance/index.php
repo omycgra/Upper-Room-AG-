@@ -868,6 +868,7 @@
 
     function buildReceiptMarkup(tx, copyLabel = 'Member Copy') {
         const currency = <?php echo json_encode($currency); ?>;
+        const church = <?php echo json_encode($churchName); ?>;
         let typeLabel = String(tx.transaction_type || '') === 'Departmental Savings' ? 'Department Offering' : (tx.transaction_type || 'Transaction');
         if (String(tx.transaction_type || '') === 'Offering' && String(tx.offering_subtype || '').trim() !== '') {
             typeLabel = `Offering (${String(tx.offering_subtype).trim()})`;
@@ -880,87 +881,116 @@
         const notes = (tx.description || '').trim() || `${typeLabel} payment recorded successfully.`;
         const dept = (tx.department_name || '').trim();
         const recordedBy = (tx.recorded_by_name || '').trim() || 'Staff';
+        const printedAt = new Date().toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
         return `
-            <div style="background:#ffffff;color:#123f78;border:3px solid #2563eb;position:relative;overflow:hidden;padding:22px 24px 20px;min-height:520px;">
-                <div style="position:absolute;top:16px;right:18px;background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:5px 12px;font-size:11px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;">${escapeReceiptHtml(copyLabel)}</div>
-                <div style="display:grid;grid-template-columns:110px 1fr 260px;gap:18px;align-items:start;border-bottom:3px solid #dbeafe;padding-bottom:16px;">
+            <style>
+                @media print {
+                    .receipt-container { 
+                        break-inside: avoid; 
+                        page-break-inside: avoid;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-shadow: none !important;
+                        border-width: 2px !important;
+                    }
+                    body { margin: 0; padding: 0; }
+                }
+            </style>
+            <div class="receipt-container" style="width:100%;max-width:1000px;margin:0 auto;font-family: Arial, sans-serif;background:#ffffff;color:#123f78;border:4px solid #3b82f6;position:relative;border-radius:8px;padding:20px;box-sizing:border-box;">
+                <!-- Official Copy Badge -->
+                <div style="position:absolute;top:15px;right:20px;background:#ffffff;color:#2563eb;border:2px solid #dbeafe;border-radius:999px;padding:4px 14px;font-size:10px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;z-index:10;">${escapeReceiptHtml(copyLabel)}</div>
+                
+                <!-- Header Section -->
+                <div style="display:grid;grid-template-columns:80px 1fr 220px;gap:15px;align-items:center;border-bottom:2px solid #eff6ff;padding-bottom:15px;">
                     <div style="display:flex;align-items:center;justify-content:center;">
-                        <img src="${receiptLogoUrl}" alt="AG Logo" style="width:92px;height:auto;object-fit:contain;">
+                        <img src="${receiptLogoUrl}" alt="AG Logo" style="width:70px;height:70px;object-fit:contain;">
                     </div>
-                    <div>
-                        <div style="font-size:28px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:#2563eb;">Assemblies Of God, Ghana</div>
-                        <div style="font-size:34px;font-weight:900;line-height:1.05;text-transform:uppercase;color:#123f78;margin-top:6px;">Upper Room Assembly</div>
-                        <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#475569;margin-top:8px;">P. O. Box 101 Mampong-Ashanti | Mob.: 0256 531265 / 020 1638748</div>
-                        <div style="font-size:14px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;margin-top:10px;">Official Church Payment Receipt</div>
+                    <div style="text-align:left;">
+                        <div style="font-size:16px;font-weight:900;letter-spacing:0.02em;text-transform:uppercase;color:#2563eb;">Assemblies Of God, Ghana</div>
+                        <div style="font-size:24px;font-weight:900;line-height:1;text-transform:uppercase;color:#1e3a8a;margin-top:2px;max-width:450px;word-wrap:break-word;">${escapeReceiptHtml(church || 'Upper Room Assembly')}</div>
+                        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-top:6px;">P. O. BOX 101 MAMPONG-ASHANTI | MOB.: 0256 531265 / 020 1638748</div>
+                        <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#1e293b;margin-top:8px;">Official Church Payment Receipt</div>
                     </div>
-                    <div style="background:#eff6ff;border:2px solid #bfdbfe;border-radius:18px;padding:16px 18px;">
-                        <div style="display:grid;grid-template-columns:88px 1fr;gap:10px;font-size:13px;line-height:1.5;">
+                    <div style="background:#f8faff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 15px;">
+                        <div style="display:grid;grid-template-columns:75px 1fr;gap:5px;font-size:10px;line-height:1.4;">
                             <div style="font-weight:800;text-transform:uppercase;color:#64748b;">Receipt No</div>
-                            <div style="font-weight:900;color:#123f78;">${escapeReceiptHtml(receiptNo)}</div>
+                            <div style="font-weight:900;color:#1e3a8a;word-break:break-all;">${escapeReceiptHtml(receiptNo)}</div>
                             <div style="font-weight:800;text-transform:uppercase;color:#64748b;">Date</div>
-                            <div style="font-weight:900;color:#123f78;">${escapeReceiptHtml(dateStr)}</div>
+                            <div style="font-weight:900;color:#1e3a8a;">${escapeReceiptHtml(dateStr)}</div>
                             <div style="font-weight:800;text-transform:uppercase;color:#64748b;">Method</div>
-                            <div style="font-weight:900;color:#123f78;">${escapeReceiptHtml(method)}</div>
+                            <div style="font-weight:900;color:#1e3a8a;">${escapeReceiptHtml(method)}</div>
                             <div style="font-weight:800;text-transform:uppercase;color:#64748b;">Type</div>
-                            <div style="font-weight:900;color:#123f78;">${escapeReceiptHtml(typeLabel)}</div>
+                            <div style="font-weight:900;color:#1e3a8a;">${escapeReceiptHtml(typeLabel)}</div>
                         </div>
                     </div>
                 </div>
-                <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:22px;padding-top:18px;">
-                    <div style="display:flex;flex-direction:column;gap:14px;">
+
+                <!-- Content Section -->
+                <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;padding-top:20px;">
+                    <!-- Left Column -->
+                    <div style="display:flex;flex-direction:column;gap:15px;">
                         <div>
-                            <div style="font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#64748b;margin-bottom:6px;">Received From</div>
-                            <div style="border:2px solid #93c5fd;border-radius:16px;min-height:54px;padding:14px 16px;font-size:22px;font-weight:900;color:#123f78;background:#ffffff;">${escapeReceiptHtml(paidBy)}</div>
+                            <div style="font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:4px;margin-left:4px;">Received From</div>
+                            <div style="border:2px solid #bfdbfe;border-radius:12px;min-height:48px;padding:10px 15px;font-size:20px;font-weight:900;color:#1e3a8a;background:#ffffff;display:flex;align-items:center;">${escapeReceiptHtml(paidBy)}</div>
                         </div>
                         <div>
-                            <div style="font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#64748b;margin-bottom:6px;">Amount Received</div>
-                            <div style="border:2px solid #93c5fd;border-radius:16px;min-height:54px;padding:14px 16px;font-size:22px;font-weight:900;color:#123f78;background:#ffffff;">${escapeReceiptHtml(currency)} ${escapeReceiptHtml(amount)}</div>
+                            <div style="font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:4px;margin-left:4px;">Amount Received</div>
+                            <div style="border:2px solid #bfdbfe;border-radius:12px;min-height:48px;padding:10px 15px;font-size:20px;font-weight:900;color:#1e3a8a;background:#ffffff;display:flex;align-items:center;">${escapeReceiptHtml(currency)} ${escapeReceiptHtml(amount)}</div>
                         </div>
                         <div>
-                            <div style="font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#64748b;margin-bottom:6px;">Purpose / Being</div>
-                            <div style="border:2px solid #93c5fd;border-radius:16px;min-height:96px;padding:14px 16px;font-size:18px;font-weight:800;color:#123f78;line-height:1.45;background:#ffffff;">${escapeReceiptHtml(typeLabel)}${dept ? ' - ' + escapeReceiptHtml(dept) : ''}<br><span style="font-size:14px;font-weight:700;color:#475569;">${escapeReceiptHtml(notes)}</span></div>
-                        </div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-                            <div style="border:2px solid #93c5fd;border-radius:16px;padding:14px 16px;min-height:78px;background:#ffffff;">
-                                <div style="font-size:11px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#64748b;">Department</div>
-                                <div style="font-size:18px;font-weight:900;color:#123f78;margin-top:8px;">${dept ? escapeReceiptHtml(dept) : 'General'}</div>
+                            <div style="font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:4px;margin-left:4px;">Purpose / Being</div>
+                            <div style="border:2px solid #bfdbfe;border-radius:12px;min-height:80px;padding:12px 15px;background:#ffffff;">
+                                <div style="font-size:16px;font-weight:900;color:#1e3a8a;">${escapeReceiptHtml(typeLabel)}</div>
+                                <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:4px;line-height:1.4;">${escapeReceiptHtml(notes)}</div>
                             </div>
-                            <div style="border:2px solid #93c5fd;border-radius:16px;padding:14px 16px;min-height:78px;background:#ffffff;">
-                                <div style="font-size:11px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#64748b;">Recorded By</div>
-                                <div style="font-size:18px;font-weight:900;color:#123f78;margin-top:8px;">${escapeReceiptHtml(recordedBy)}</div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
+                            <div style="border:2px solid #bfdbfe;border-radius:12px;padding:10px 15px;background:#ffffff;">
+                                <div style="font-size:8px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;">Department</div>
+                                <div style="font-size:14px;font-weight:900;color:#1e3a8a;margin-top:4px;">${dept ? escapeReceiptHtml(dept) : 'General'}</div>
+                            </div>
+                            <div style="border:2px solid #bfdbfe;border-radius:12px;padding:10px 15px;background:#ffffff;">
+                                <div style="font-size:8px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;">Recorded By</div>
+                                <div style="font-size:14px;font-weight:900;color:#1e3a8a;margin-top:4px;">${escapeReceiptHtml(recordedBy)}</div>
                             </div>
                         </div>
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:14px;">
-                        <div style="border-radius:22px;background:linear-gradient(135deg,#1d4ed8 0%,#2563eb 58%,#60a5fa 100%);padding:20px 22px;color:#ffffff;min-height:160px;display:flex;flex-direction:column;justify-content:space-between;">
-                            <div style="font-size:12px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;opacity:0.9;">Receipt Total</div>
-                            <div style="font-size:42px;font-weight:900;line-height:1;">${escapeReceiptHtml(currency)} ${escapeReceiptHtml(amount)}</div>
-                            <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;font-weight:700;opacity:0.95;">
+
+                    <!-- Right Column -->
+                    <div style="display:flex;flex-direction:column;gap:15px;">
+                        <div style="padding:5px;">
+                            <div style="font-size:10px;font-weight:800;letter-spacing:0.15em;text-transform:uppercase;color:#94a3b8;">Receipt Total</div>
+                            <div style="font-size:42px;font-weight:900;color:#94a3b8;margin-top:8px;line-height:1;">${escapeReceiptHtml(currency)} ${escapeReceiptHtml(amount)}</div>
+                            <div style="display:flex;justify-content:flex-start;gap:20px;font-size:11px;font-weight:800;color:#cbd5e1;margin-top:10px;text-transform:uppercase;letter-spacing:0.05em;">
                                 <span>${escapeReceiptHtml(typeLabel)}</span>
                                 <span>${escapeReceiptHtml(method)}</span>
                             </div>
                         </div>
-                        <div style="border:2px solid #93c5fd;border-radius:18px;padding:16px 18px;background:#f8fbff;">
-                            <div style="font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#64748b;">Payment Breakdown</div>
-                            <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:12px;align-items:center;">
-                                <div style="font-size:15px;font-weight:800;color:#123f78;">Cash / Value Received</div>
-                                <div style="font-size:18px;font-weight:900;color:#123f78;">${escapeReceiptHtml(currency)} ${escapeReceiptHtml(amount)}</div>
-                                <div style="font-size:15px;font-weight:800;color:#123f78;">Balance</div>
-                                <div style="font-size:18px;font-weight:900;color:#123f78;">${escapeReceiptHtml(currency)} 0.00</div>
-                                <div style="font-size:15px;font-weight:800;color:#123f78;">Cheque Ref</div>
-                                <div style="font-size:16px;font-weight:900;color:#123f78;">${method === 'Check' ? escapeReceiptHtml(receiptNo) : 'N/A'}</div>
+
+                        <div style="border:2px solid #bfdbfe;border-radius:12px;padding:15px 20px;background:#f8faff;">
+                            <div style="font-size:9px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:#1e3a8a;margin-bottom:10px;border-bottom:1px solid #dbeafe;padding-bottom:6px;">Payment Breakdown</div>
+                            <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;">
+                                <div style="font-size:12px;font-weight:800;color:#1e3a8a;">Value Received</div>
+                                <div style="font-size:14px;font-weight:900;color:#1e3a8a;">${escapeReceiptHtml(currency)} ${escapeReceiptHtml(amount)}</div>
+                                
+                                <div style="font-size:12px;font-weight:800;color:#1e3a8a;">Balance</div>
+                                <div style="font-size:14px;font-weight:900;color:#1e3a8a;">${escapeReceiptHtml(currency)} 0.00</div>
+                                
+                                <div style="font-size:12px;font-weight:800;color:#1e3a8a;">Ref</div>
+                                <div style="font-size:12px;font-weight:900;color:#1e3a8a;">${method === 'Check' ? escapeReceiptHtml(receiptNo) : 'N/A'}</div>
                             </div>
                         </div>
-                        <div style="border:2px dashed #93c5fd;border-radius:18px;padding:16px 18px;flex:1;display:flex;flex-direction:column;justify-content:flex-end;background:#ffffff;">
-                            <div style="font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#64748b;">Authorized Signature</div>
-                            <div style="border-bottom:2px solid #2563eb;height:42px;margin-top:20px;"></div>
-                            <div style="display:flex;justify-content:space-between;gap:10px;margin-top:10px;font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;">
-                                <span>Upper Room Assembly</span>
-                                <span>Thank You</span>
-                            </div>
+
+                        <div style="border:2px dashed #bfdbfe;border-radius:12px;padding:15px;flex:1;display:flex;flex-direction:column;justify-content:flex-end;background:#ffffff;min-height:80px;">
+                            <div style="font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;">Authorized Signature</div>
+                            <div style="border-bottom:2px solid #2563eb;height:2px;margin-top:30px;width:100%;"></div>
                         </div>
                     </div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:9px;font-weight:700;color:#64748b;margin-top:15px;padding:0 4px;">
+                    <div>Printed: ${escapeReceiptHtml(printedAt)}</div>
+                    <div style="text-transform:uppercase;letter-spacing:0.1em;">Thank You</div>
                 </div>
             </div>
         `;

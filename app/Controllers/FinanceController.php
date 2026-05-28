@@ -497,17 +497,26 @@ class FinanceController extends BaseController {
         if ($financeId) {
             AuditLog::log("Recorded " . $data['transaction_type'] . " of " . $data['amount'], "finances", $financeId);
             $successMessage = 'Transaction recorded successfully';
-            $smsResult = FinancePaymentSmsService::sendForTransaction((int)$financeId);
-            if (($smsResult['status'] ?? '') === 'sent') {
-                $successMessage = (string)($smsResult['message'] ?? $successMessage);
-            } elseif (($smsResult['status'] ?? '') === 'duplicate') {
-                $successMessage .= '. ' . trim((string)($smsResult['message'] ?? 'SMS was already sent for this transaction.'));
-            } elseif (($smsResult['status'] ?? '') === 'error' || ($smsResult['status'] ?? '') === 'skipped') {
-                $successMessage = 'Transaction recorded, but SMS was not sent. ' . trim((string)($smsResult['message'] ?? ''));
+            $smsResult = null;
+            $txTypeLower = strtolower(trim((string)($data['transaction_type'] ?? '')));
+            $shouldSendSms = !empty($_POST['send_sms']);
+            
+            if (in_array($txTypeLower, ['tithe', 'welfare', 'offering'], true)) {
+                if ($shouldSendSms) {
+                    $smsResult = FinancePaymentSmsService::sendForTransaction((int)$financeId);
+                    if (($smsResult['status'] ?? '') === 'sent') {
+                        $successMessage = (string)($smsResult['message'] ?? $successMessage);
+                    } elseif (($smsResult['status'] ?? '') === 'duplicate') {
+                        $successMessage .= '. ' . trim((string)($smsResult['message'] ?? 'SMS was already sent for this transaction.'));
+                    } elseif (($smsResult['status'] ?? '') === 'error' || ($smsResult['status'] ?? '') === 'skipped') {
+                        $successMessage = 'Transaction recorded, but SMS was not sent. ' . trim((string)($smsResult['message'] ?? ''));
+                    }
+                } else {
+                    $successMessage = 'Transaction recorded successfully (SMS skipped).';
+                }
             }
 
             $deptSmsResult = null;
-            $txTypeLower = strtolower(trim((string)($data['transaction_type'] ?? '')));
             if ((int)($data['department_id'] ?? 0) > 0 && !in_array($txTypeLower, ['tithe', 'welfare'], true)) {
                 $deptSmsResult = FinanceDepartmentHeadSmsService::sendForTransaction((int)$financeId);
             }
@@ -517,7 +526,7 @@ class FinanceController extends BaseController {
                 $successMessage .= ' ' . trim((string)($deptSmsResult['message'] ?? ''));
             }
 
-            if (($smsResult['status'] ?? '') === 'error' || ($smsResult['status'] ?? '') === 'skipped') {
+            if ($smsResult && (($smsResult['status'] ?? '') === 'error' || ($smsResult['status'] ?? '') === 'skipped')) {
                 Session::flash('error', $successMessage);
             } else {
                 Session::flash('success', $successMessage);

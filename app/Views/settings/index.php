@@ -787,6 +787,44 @@
                     </div>
                 </div>
 
+                <div class="space-y-6 pt-4">
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Payment Confirmation SMS Template</label>
+                        <div class="relative group">
+                            <i class="fas fa-comment-dots absolute left-5 top-6 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <textarea name="sms_payment_template" rows="3" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-3xl pl-14 pr-6 py-6 text-xs font-bold text-white transition-all outline-none resize-none" placeholder="Default: {church_name}: Hi {name}, thank you for your {type} contribution of {currency} {amount}. We appreciate your support. God bless you."><?php echo htmlspecialchars($smsPaymentTemplate ?? ''); ?></textarea>
+                        </div>
+                        <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Placeholders: {church_name}, {name}, {type}, {currency}, {amount}</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Birthday Wish SMS Template</label>
+                        <div class="relative group">
+                            <i class="fas fa-cake-candles absolute left-5 top-6 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <textarea name="sms_birthday_template" rows="3" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-3xl pl-14 pr-6 py-6 text-xs font-bold text-white transition-all outline-none resize-none" placeholder="Default: {church_name}: Happy Birthday {name}! We celebrate you today and pray that God blesses you with joy, favor, and peace in this new year. God bless you."><?php echo htmlspecialchars($smsBirthdayTemplate ?? ''); ?></textarea>
+                        </div>
+                        <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Placeholders: {church_name}, {name}</p>
+                    </div>
+
+                    <div class="flex items-center gap-4 bg-accent/5 border border-accent/20 rounded-2xl p-6">
+                        <div class="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center border border-accent/20">
+                            <i class="fas fa-cake-candles text-accent"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <label for="auto_birthday_sms" class="text-[11px] font-black text-white uppercase tracking-widest cursor-pointer">Automatic Birthday Wishes</label>
+                                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Send SMS automatically to members on their birthday</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="auto_birthday_sms" id="auto_birthday_sms" value="1" class="sr-only peer" <?php echo ($autoBirthdaySms ?? '0') === '1' ? 'checked' : ''; ?>>
+                                    <div class="w-12 h-7 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent peer-checked:after:bg-slate-900 peer-checked:after:border-accent"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <button type="submit" class="w-full bg-accent text-slate-900 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover-glow-yellow active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
                     Save SMS Settings
                 </button>

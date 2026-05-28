@@ -28,6 +28,12 @@ class BirthdayService
     private static function dispatchBirthdayWishes(): void
     {
         try {
+            // Check if automatic birthday wishes are enabled in settings
+            $autoEnabled = (string)AppConfig::getSetting('auto_birthday_sms', '0');
+            if ($autoEnabled !== '1') {
+                return;
+            }
+
             $db = Database::getInstance();
             self::ensureBirthdayLogTable($db);
 
@@ -75,10 +81,24 @@ class BirthdayService
 
     private static function buildBirthdayMessage(array $member): string
     {
-        $churchName = trim((string)AppConfig::getSetting('church_name', 'YOUR CHURCH'));
-        $firstName = trim((string)($member['first_name'] ?? 'MEMBER'));
+        $churchName = trim((string)AppConfig::getSetting('church_name', 'CHURCH'));
+        $churchNameClean = strip_tags(html_entity_decode($churchName, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $prefix = (strlen($churchNameClean) > 15) ? substr($churchNameClean, 0, 12) . '...' : $churchNameClean;
 
-        return 'Happy Birthday ' . $firstName . '! ' . $churchName . ' celebrates you today and prays that God blesses you with joy, strength, favor, and peace throughout this new year. Have a blessed day.';
+        $firstName = trim((string)($member['first_name'] ?? 'Member'));
+        $nameClean = strip_tags(html_entity_decode($firstName, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+        $template = trim((string)AppConfig::getSetting('sms_birthday_template', ''));
+        if ($template === '') {
+            // Default template
+            return "{$prefix}: Happy Birthday {$nameClean}! We celebrate you today and pray that God blesses you with joy, favor, and peace in this new year. God bless you.";
+        }
+
+        // Parse template
+        $search = ['{church_name}', '{name}'];
+        $replace = [$prefix, $nameClean];
+
+        return trim(str_replace($search, $replace, $template));
     }
 
     private static function hasBirthdayWishForYear(Database $db, int $memberId, int $year): bool

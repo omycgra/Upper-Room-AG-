@@ -101,12 +101,19 @@ class DashboardController extends BaseController {
                 $staffSummary = $financeModel->getRecorderTotals((int)Session::get('user_id'), date('m'), date('Y'), $allowedTypes);
                 $staffTransactions = $financeModel->getRecentTransactionsByRecorderWithMeta((int)Session::get('user_id'), 12, $allowedTypes);
                 $staffChangeRequests = $financeModel->getChangeRequestsForRequester((int)Session::get('user_id'), 8);
+                
+                // Fetch members and departments for quick entry
+                $members = $memberModel->all('first_name ASC, last_name ASC');
+                $departments = $deptModel->all('name ASC');
+
                 $staffContext = [
                     'summary' => $staffSummary,
                     'transactions' => $staffTransactions,
                     'allowed_types' => $allowedTypes,
                     'month_label' => date('F Y'),
-                    'change_requests' => $staffChangeRequests
+                    'change_requests' => $staffChangeRequests,
+                    'members' => $members,
+                    'departments' => $departments
                 ];
             }
         }

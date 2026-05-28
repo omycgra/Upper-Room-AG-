@@ -75,6 +75,7 @@ class SmsService {
             'recipient_count_raw' => count($inputRecipients),
             'recipient_count_normalized' => count($recipients),
             'recipient_samples' => array_slice($normalizedPairs, 0, 5),
+            'message' => $message,
             'message_len' => mb_strlen($message),
         ]);
         // #endregion debug-point sms-1
@@ -341,16 +342,20 @@ class SmsService {
         $raw = trim((string)$phone);
         if ($raw === '') return '';
 
-        $raw = preg_replace('/\s+/', ' ', $raw);
+        // Remove all non-numeric characters except +
+        $clean = preg_replace('/[^\d+]/', '', $raw);
 
-        if (preg_match('/(\+233|233|0)\d{9}/', $raw, $m)) {
+        // Try to match standard formats in the cleaned string
+        if (preg_match('/(\+233|233|0)\d{9}/', $clean, $m)) {
             return (string)($m[0] ?? '');
         }
-        if (preg_match('/\b\d{9}\b/', $raw, $m)) {
-            return (string)($m[0] ?? '');
+        
+        // If it's just 9 digits, it's likely a Ghana number without the leading 0
+        if (preg_match('/\b\d{9}\b/', $clean, $m)) {
+            return '233' . (string)($m[0] ?? '');
         }
 
-        return $raw;
+        return $clean;
     }
 
     private function getCandidateApiKeys($key) {

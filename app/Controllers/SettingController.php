@@ -52,6 +52,9 @@ class SettingController extends BaseController {
         $smsTwilioAccountSid = AppConfig::getSetting('sms_twilio_account_sid', '');
         $smsTwilioAuthToken = AppConfig::getSetting('sms_twilio_auth_token', '');
         $smsTwilioFrom = AppConfig::getSetting('sms_twilio_from', '');
+        $autoBirthdaySms = AppConfig::getSetting('auto_birthday_sms', '0');
+        $smsPaymentTemplate = AppConfig::getSetting('sms_payment_template', '');
+        $smsBirthdayTemplate = AppConfig::getSetting('sms_birthday_template', '');
         $attendanceMode = strtolower(trim((string)AppConfig::getSetting('attendance_mode', 'manual')));
         if (!in_array($attendanceMode, ['manual', 'biotime', 'qrcode', 'link'], true)) {
             $attendanceMode = 'manual';
@@ -110,6 +113,9 @@ class SettingController extends BaseController {
             'smsTwilioAccountSid' => $smsTwilioAccountSid,
             'smsTwilioAuthToken' => $smsTwilioAuthToken,
             'smsTwilioFrom' => $smsTwilioFrom,
+            'autoBirthdaySms' => $autoBirthdaySms,
+            'smsPaymentTemplate' => $smsPaymentTemplate,
+            'smsBirthdayTemplate' => $smsBirthdayTemplate,
             'attendanceConfig' => $attendanceConfig,
             'storageConfig' => $storageConfig,
             'dbConfig' => $dbConfig,
@@ -643,6 +649,9 @@ class SettingController extends BaseController {
         $twilioAccountSid = trim($_POST['sms_twilio_account_sid'] ?? '');
         $twilioAuthToken = trim($_POST['sms_twilio_auth_token'] ?? '');
         $twilioFrom = trim($_POST['sms_twilio_from'] ?? '');
+        $autoBirthdaySms = isset($_POST['auto_birthday_sms']) ? '1' : '0';
+        $smsPaymentTemplate = trim((string)($_POST['sms_payment_template'] ?? ''));
+        $smsBirthdayTemplate = trim((string)($_POST['sms_birthday_template'] ?? ''));
 
         if ($senderId !== '') {
             $senderId = preg_replace('/\s+/', ' ', $senderId);
@@ -677,6 +686,9 @@ class SettingController extends BaseController {
             $this->upsertSetting($db, 'sms_twilio_account_sid', $twilioAccountSid);
             $this->upsertSetting($db, 'sms_twilio_auth_token', $twilioAuthToken);
             $this->upsertSetting($db, 'sms_twilio_from', $twilioFrom);
+            $this->upsertSetting($db, 'auto_birthday_sms', $autoBirthdaySms);
+            $this->upsertSetting($db, 'sms_payment_template', $smsPaymentTemplate);
+            $this->upsertSetting($db, 'sms_birthday_template', $smsBirthdayTemplate);
 
             AuditLog::log("Updated SMS configuration", "settings");
             Session::flash('success', 'SMS configuration updated successfully');

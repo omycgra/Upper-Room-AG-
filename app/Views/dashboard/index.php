@@ -102,8 +102,11 @@
                     <a href="<?php echo BASE_URL; ?>/members/add" class="w-full inline-flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all">
                         <i class="fas fa-user-plus mr-2 text-accent"></i> Add Member
                     </a>
-                    <button type="button" onclick="openDeptExpenseRequestModal()" class="w-full inline-flex items-center justify-center bg-accent text-slate-900 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
-                        <i class="fas fa-hand-holding-dollar mr-2"></i> Request Expense
+                    <button type="button" onclick="openQuickEntryModal()" class="w-full inline-flex items-center justify-center bg-accent text-slate-900 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                        <i class="fas fa-bolt mr-2"></i> Quick Entry
+                    </button>
+                    <button type="button" onclick="openDeptExpenseRequestModal()" class="w-full inline-flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all">
+                        <i class="fas fa-hand-holding-dollar mr-2 text-accent"></i> Request Expense
                     </button>
                     <a href="<?php echo BASE_URL; ?>/members" class="w-full inline-flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all">
                         <i class="fas fa-users mr-2 text-accent"></i> Members
@@ -151,6 +154,10 @@
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
+                </div>
+            </div>
+                </div>
+            </div>
                 </div>
             </div>
 
@@ -656,9 +663,14 @@
                     <h3 class="text-3xl sm:text-4xl font-black text-white tracking-tight mt-3">Fast Transaction Entry</h3>
                     <p class="text-sm font-bold text-slate-400 mt-4 max-w-2xl">Record only general offering, tithe, department offering, and welfare. Use the quick buttons below to enter payments faster and print a receipt instantly.</p>
                 </div>
-                <a href="<?php echo BASE_URL; ?>/finance/add" class="inline-flex items-center justify-center bg-accent text-slate-900 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
-                    <i class="fas fa-plus mr-2"></i> Record Payment
-                </a>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="button" onclick="openQuickEntryModal()" class="inline-flex items-center justify-center bg-accent text-slate-900 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                        <i class="fas fa-bolt mr-2"></i> Quick Entry
+                    </button>
+                    <a href="<?php echo BASE_URL; ?>/finance/add" class="inline-flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all">
+                        <i class="fas fa-plus mr-2 text-accent"></i> Record Payment
+                    </a>
+                </div>
             </div>
         </div>
         <div class="p-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -740,7 +752,7 @@
                                                 : ($type === 'Mini Harvest' ? 'fa-seedling'
                                                     : ($type === 'Expense' ? 'fa-arrow-trend-down' : 'fa-receipt'))))));
                         ?>
-                        <a href="<?php echo BASE_URL; ?>/finance/add?type=<?php echo urlencode($type); ?>" class="w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-4 transition-all">
+                        <button type="button" onclick="openQuickEntryModal('<?php echo htmlspecialchars($type); ?>')" class="w-full text-left flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-4 transition-all">
                             <span class="w-9 h-9 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 text-accent">
                                 <i class="fas <?php echo $icon; ?> text-sm"></i>
                             </span>
@@ -748,7 +760,7 @@
                                 <span class="block text-[10px] font-black uppercase tracking-widest text-slate-200 truncate"><?php echo htmlspecialchars($label); ?></span>
                                 <span class="block text-[9px] font-black uppercase tracking-widest text-slate-500 truncate"><?php echo htmlspecialchars($type); ?></span>
                             </span>
-                        </a>
+                        </button>
                     <?php endforeach; ?>
                 </div>
             </div>
@@ -1347,4 +1359,355 @@
         </button>
     </div>
 </div>
+<?php endif; ?>
+
+<?php if ($isStaff && !empty($staff)): ?>
+<div id="quick-entry-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-[60] hidden flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-4xl rounded-[3.5rem] overflow-hidden shadow-2xl transform transition-all duration-500 scale-95 opacity-0 border-white/10 max-h-[95vh] flex flex-col" id="quick-entry-modal-content">
+        <div class="px-8 sm:px-10 py-8 bg-slate-900 relative overflow-hidden border-b border-white/5 flex-shrink-0">
+            <div class="relative z-10 flex justify-between items-center text-white">
+                <div>
+                    <h3 class="text-3xl font-black tracking-tighter">Quick Transaction</h3>
+                    <p class="text-accent text-[10px] font-black mt-2 tracking-[0.3em] uppercase">Fast Cashier Entry</p>
+                </div>
+                <button type="button" onclick="closeQuickEntryModal()" class="w-12 h-12 bg-white/5 hover:bg-accent hover:text-slate-900 rounded-2xl flex items-center justify-center transition-all border border-white/10">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <form action="<?php echo BASE_URL; ?>/finance/store" method="POST" class="p-6 sm:p-10 bg-slate-900/50 overflow-y-auto custom-scrollbar flex-1">
+            <input type="hidden" name="transaction_type" id="quick_transaction_type" value="Offering">
+            <input type="hidden" name="redirect_to" value="dashboard">
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="space-y-8">
+                    <div id="quick-income-category-wrap" class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Income Category</label>
+                        <?php
+                            $isFinanceUser = Auth::isFinance();
+                            $incomeTypeButtons = [];
+                            $incomeTypeButtons[] = ['value' => 'Offering', 'label' => 'General Offering', 'icon' => 'fa-receipt'];
+                            if ($isFinanceUser) {
+                                $incomeTypeButtons[] = ['value' => 'Sunday School', 'label' => 'Sunday School', 'icon' => 'fa-chalkboard-teacher'];
+                                $incomeTypeButtons[] = ['value' => 'Annual Harvest', 'label' => 'Annual Harvest', 'icon' => 'fa-wheat-awn'];
+                                $incomeTypeButtons[] = ['value' => 'Mini Harvest', 'label' => 'Mini Harvest', 'icon' => 'fa-seedling'];
+                            }
+                            $incomeTypeButtons[] = ['value' => 'Tithe', 'label' => 'Tithe', 'icon' => 'fa-hand-holding-dollar'];
+                            $incomeTypeButtons[] = ['value' => 'Departmental Savings', 'label' => 'Department Offering', 'icon' => 'fa-sitemap'];
+                            $incomeTypeButtons[] = ['value' => 'Welfare', 'label' => 'Welfare', 'icon' => 'fa-heart'];
+                        ?>
+                        <div class="grid grid-cols-2 gap-3">
+                            <?php foreach ($incomeTypeButtons as $opt): ?>
+                                <button
+                                    type="button"
+                                    data-quick-income-type="1"
+                                    data-value="<?php echo htmlspecialchars($opt['value']); ?>"
+                                    class="bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 w-full flex items-center gap-3 rounded-2xl border px-4 py-4 transition-all"
+                                >
+                                    <span class="text-accent w-9 h-9 rounded-xl flex items-center justify-center bg-white/5 border border-white/10">
+                                        <i class="fas <?php echo htmlspecialchars($opt['icon']); ?> text-sm"></i>
+                                    </span>
+                                    <span class="min-w-0 text-left">
+                                        <span class="block text-[10px] font-black uppercase tracking-widest truncate"><?php echo htmlspecialchars($opt['label']); ?></span>
+                                    </span>
+                                </button>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <div id="quick-offering-subtype-wrap" class="space-y-3 hidden">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Offering Type</label>
+                        <div class="relative group">
+                            <i class="fas fa-gift absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <select id="quick_offering_subtype" name="offering_subtype" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-5 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
+                                <option value="Main Offering">Main Offering</option>
+                                <option value="Thanksgiving">Thanksgiving</option>
+                            </select>
+                            <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div class="space-y-3">
+                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Amount (GHS)</label>
+                            <div class="relative group">
+                                <i class="fas fa-coins absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                                <input type="number" step="0.01" id="quick_amount" name="amount" required class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-5 text-sm font-bold text-white transition-all outline-none" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Payment Method</label>
+                            <div class="relative group">
+                                <i class="fas fa-credit-card absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                                <select name="payment_method" required class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-5 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
+                                    <option value="Cash">Cash</option>
+                                    <option value="MoMo">MoMo</option>
+                                    <option value="Bank Transfer">Bank Transfer</option>
+                                    <option value="Check">Check</option>
+                                </select>
+                                <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Quick Calculator</label>
+                        <div class="glass-card rounded-[2.5rem] p-6 border-white/10 space-y-5">
+                            <div class="grid grid-cols-4 gap-3">
+                                <button type="button" class="quick-calc-quick px-3 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-200 uppercase tracking-widest" data-value="10">10</button>
+                                <button type="button" class="quick-calc-quick px-3 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-200 uppercase tracking-widest" data-value="20">20</button>
+                                <button type="button" class="quick-calc-quick px-3 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-200 uppercase tracking-widest" data-value="50">50</button>
+                                <button type="button" class="quick-calc-quick px-3 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-200 uppercase tracking-widest" data-value="100">100</button>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="1">1</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="2">2</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="3">3</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="4">4</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="5">5</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="6">6</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="7">7</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="8">8</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="9">9</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key=".">.</button>
+                                <button type="button" class="quick-calc-key px-3 py-4 rounded-2xl bg-white/5 border border-white/10 text-sm font-black text-white" data-key="0">0</button>
+                                <button type="button" id="quick-calc-clear" class="px-3 py-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-sm font-black text-rose-300">C</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-8">
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Department (For Department Offering)</label>
+                        <div class="relative group">
+                            <i class="fas fa-sitemap absolute left-5 top-1/2 -translate-y-1/2 text-slate-600"></i>
+                            <select id="quick_department_id" name="department_id" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-5 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
+                                <option value="">None</option>
+                                <?php foreach (($staff['departments'] ?? []) as $d): ?>
+                                    <option value="<?php echo (int)$d['id']; ?>"><?php echo htmlspecialchars($d['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Member (Required For Tithe & Welfare)</label>
+                        <div class="relative group">
+                            <i class="fas fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <input id="quick_member_search" type="text" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-sm font-bold text-white transition-all outline-none" placeholder="Search member by name...">
+                            <div id="quick_member_search_results" class="hidden absolute left-0 right-0 top-full mt-2 z-[70] rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto custom-scrollbar"></div>
+                        </div>
+                        <div class="relative group mt-3">
+                            <i class="fas fa-user absolute left-5 top-1/2 -translate-y-1/2 text-slate-600"></i>
+                            <select id="quick_member_id" name="member_id" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-5 text-sm font-bold text-white transition-all outline-none appearance-none cursor-pointer">
+                                <option value="">Select member when needed</option>
+                                <?php foreach (($staff['members'] ?? []) as $member): ?>
+                                    <option value="<?php echo (int)$member['id']; ?>"><?php echo htmlspecialchars(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Description / Notes</label>
+                        <div class="relative group">
+                            <i class="fas fa-align-left absolute left-5 top-6 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                            <textarea name="description" rows="4" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-3xl pl-14 pr-6 py-6 text-sm font-bold text-white transition-all outline-none resize-none" placeholder="Optional notes..."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="quick-sms-notify-wrap" class="hidden space-y-4 pt-4">
+                        <div class="flex items-center gap-4 bg-accent/5 border border-accent/20 rounded-2xl p-5">
+                            <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center border border-accent/20">
+                                <i class="fas fa-comment-sms text-accent"></i>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between">
+                                    <label for="quick_send_sms" class="text-[10px] font-black text-white uppercase tracking-widest cursor-pointer">Send SMS Notification</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="send_sms" id="quick_send_sms" value="1" class="sr-only peer" checked>
+                                        <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent peer-checked:after:bg-slate-900 peer-checked:after:border-accent"></div>
+                                    </label>
+                                </div>
+                                <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Send payment confirmation SMS instantly</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button type="submit" class="w-full bg-accent text-slate-900 py-6 rounded-2xl font-black text-xs uppercase tracking-[0.3em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
+                            Save Transaction
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openQuickEntryModal(type = 'Offering') {
+        const modal = document.getElementById('quick-entry-modal');
+        const content = document.getElementById('quick-entry-modal-content');
+        if (!modal || !content) return;
+
+        const typeInput = document.getElementById('quick_transaction_type');
+        if (typeInput) {
+            typeInput.value = type;
+            // Trigger sync
+            const buttons = document.querySelectorAll('[data-quick-income-type="1"]');
+            buttons.forEach(btn => {
+                if (btn.dataset.value === type) {
+                    btn.classList.add('bg-accent', 'text-slate-900', 'border-accent/30', 'shadow-xl', 'shadow-yellow-500/10');
+                    btn.classList.remove('bg-white/5', 'text-slate-200', 'border-white/10');
+                } else {
+                    btn.classList.remove('bg-accent', 'text-slate-900', 'border-accent/30', 'shadow-xl', 'shadow-yellow-500/10');
+                    btn.classList.add('bg-white/5', 'text-slate-200', 'border-white/10');
+                }
+            });
+        }
+
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }, 10);
+        
+        // Initial sync of rules
+        if (window.syncQuickRules) window.syncQuickRules();
+    }
+
+    function closeQuickEntryModal() {
+        const modal = document.getElementById('quick-entry-modal');
+        const content = document.getElementById('quick-entry-modal-content');
+        if (!modal || !content) return;
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    (function () {
+        const typeInput = document.getElementById('quick_transaction_type');
+        const incomeWrap = document.getElementById('quick-income-category-wrap');
+        const amountInput = document.getElementById('quick_amount');
+        const memberSelect = document.getElementById('quick_member_id');
+        const memberSearch = document.getElementById('quick_member_search');
+        const memberSearchResults = document.getElementById('quick_member_search_results');
+        const departmentSelect = document.getElementById('quick_department_id');
+        const smsNotifyWrap = document.getElementById('quick-sms-notify-wrap');
+        const offeringSubtypeWrap = document.getElementById('quick-offering-subtype-wrap');
+        if (!typeInput || !incomeWrap) return;
+
+        const incomeTypeButtons = Array.from(incomeWrap.querySelectorAll('[data-quick-income-type="1"]'));
+        const syncIncomeTypeButtons = function () {
+            const current = String(typeInput.value || '');
+            incomeTypeButtons.forEach((btn) => {
+                const v = String(btn.dataset.value || '');
+                const active = v !== '' && v === current;
+                btn.classList.toggle('bg-accent', active);
+                btn.classList.toggle('text-slate-900', active);
+                btn.classList.toggle('border-accent/30', active);
+                btn.classList.toggle('shadow-xl', active);
+                btn.classList.toggle('shadow-yellow-500/10', active);
+                btn.classList.toggle('bg-white/5', !active);
+                btn.classList.toggle('text-slate-200', !active);
+                btn.classList.toggle('border-white/10', !active);
+            });
+        };
+
+        window.syncQuickRules = () => {
+            const selectedType = typeInput.value || '';
+            const isOffering = selectedType === 'Offering';
+            const isTitheOrWelfare = selectedType === 'Tithe' || selectedType === 'Welfare';
+            const requiresDepartment = selectedType === 'Departmental Savings';
+            const canHaveMember = isTitheOrWelfare || isOffering;
+
+            if (offeringSubtypeWrap) {
+                offeringSubtypeWrap.classList.toggle('hidden', !isOffering);
+            }
+            if (smsNotifyWrap) {
+                smsNotifyWrap.classList.toggle('hidden', !canHaveMember);
+            }
+            if (departmentSelect) {
+                departmentSelect.disabled = !requiresDepartment;
+                departmentSelect.classList.toggle('opacity-60', !requiresDepartment);
+                if (!requiresDepartment) departmentSelect.value = '';
+            }
+            if (memberSelect) {
+                memberSelect.disabled = !canHaveMember;
+                memberSelect.classList.toggle('opacity-60', !canHaveMember);
+                if (!canHaveMember) memberSelect.value = '';
+            }
+            if (memberSearch) {
+                memberSearch.disabled = !canHaveMember;
+                memberSearch.classList.toggle('opacity-60', !canHaveMember);
+                if (!canHaveMember) memberSearch.value = '';
+            }
+        };
+
+        incomeTypeButtons.forEach((btn) => {
+            btn.addEventListener('click', function () {
+                typeInput.value = btn.dataset.value;
+                syncIncomeTypeButtons();
+                window.syncQuickRules();
+            });
+        });
+
+        const memberOptions = memberSelect ? Array.from(memberSelect.options).filter(o => o.value !== '').map(o => ({ value: o.value, label: o.textContent })) : [];
+
+        const hideMemberSuggestions = () => {
+            if (!memberSearchResults) return;
+            memberSearchResults.classList.add('hidden');
+            memberSearchResults.innerHTML = '';
+        };
+
+        const chooseMember = (value) => {
+            if (!memberSelect) return;
+            memberSelect.value = value;
+            const selected = memberOptions.find(o => o.value === value);
+            if (memberSearch && selected) memberSearch.value = selected.label;
+            hideMemberSuggestions();
+        };
+
+        if (memberSearch) {
+            memberSearch.addEventListener('input', () => {
+                const val = memberSearch.value.trim().toLowerCase();
+                if (!val) { hideMemberSuggestions(); return; }
+                const filtered = memberOptions.filter(o => o.label.toLowerCase().includes(val)).slice(0, 8);
+                if (!filtered.length) {
+                    memberSearchResults.innerHTML = '<div class="px-5 py-4 text-xs font-bold text-slate-500">No match.</div>';
+                } else {
+                    memberSearchResults.innerHTML = filtered.map(o => `
+                        <button type="button" class="quick-member-suggestion w-full text-left px-5 py-4 text-sm font-bold text-slate-200 hover:bg-white/5 transition-all border-b border-white/5 last:border-b-0" data-value="${o.value}">${o.label}</button>
+                    `).join('');
+                }
+                memberSearchResults.classList.remove('hidden');
+                memberSearchResults.querySelectorAll('.quick-member-suggestion').forEach(b => {
+                    b.addEventListener('mousedown', (e) => { e.preventDefault(); chooseMember(b.dataset.value); });
+                });
+            });
+            memberSearch.addEventListener('blur', () => setTimeout(hideMemberSuggestions, 150));
+        }
+
+        if (amountInput) {
+            document.querySelectorAll('.quick-calc-quick').forEach(b => {
+                b.addEventListener('click', () => { amountInput.value = b.dataset.value; amountInput.focus(); });
+            });
+            document.querySelectorAll('.quick-calc-key').forEach(b => {
+                b.addEventListener('click', () => {
+                    const key = b.dataset.key;
+                    if (key === '.' && amountInput.value.includes('.')) return;
+                    amountInput.value += key;
+                    amountInput.focus();
+                });
+            });
+            const clear = document.getElementById('quick-calc-clear');
+            if (clear) clear.addEventListener('click', () => { amountInput.value = ''; amountInput.focus(); });
+        }
+    })();
+</script>
 <?php endif; ?>

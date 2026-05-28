@@ -244,6 +244,24 @@
                     </div>
                 </div>
 
+                <div id="sms-notify-wrap" class="hidden space-y-4 pt-4">
+                    <div class="flex items-center gap-4 bg-accent/5 border border-accent/20 rounded-2xl p-5">
+                        <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center border border-accent/20">
+                            <i class="fas fa-comment-sms text-accent"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <label for="send_sms" class="text-[10px] font-black text-white uppercase tracking-widest cursor-pointer">Send SMS Notification</label>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="send_sms" id="send_sms" value="1" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent peer-checked:after:bg-slate-900 peer-checked:after:border-accent"></div>
+                                </label>
+                            </div>
+                            <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Send payment confirmation SMS to the member instantly</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex flex-col sm:flex-row gap-4 pt-4">
                     <button type="submit" class="flex-1 bg-accent text-slate-900 py-6 rounded-2xl font-black text-xs uppercase tracking-[0.3em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/10">
                         <?php echo $isStaff ? 'Save Transaction' : 'Save Transaction'; ?>
@@ -466,18 +484,23 @@
         const syncOfferingRules = () => {
             if (!departmentSelect) return;
             const isIncome = typeInput.value !== 'Expense';
-            const selectedType = incomeCategory.value || '';
+            const selectedType = isIncome ? (incomeCategory.value || '') : '';
             const isOffering = selectedType === 'Offering';
+            const isTitheOrWelfare = selectedType === 'Tithe' || selectedType === 'Welfare';
             const requiresDepartment = selectedType === 'Departmental Savings';
-            const requiresMember = selectedType === 'Tithe' || selectedType === 'Welfare';
-            const isChurchOnlyIncome = isIncome && !isOffering && !requiresDepartment && !requiresMember;
+            const canHaveMember = isTitheOrWelfare || (isIncome && isOffering);
+            
             const offeringSubtypeWrap = document.getElementById('offering-subtype-wrap');
             const offeringSubtype = document.getElementById('offering_subtype');
+            const smsNotifyWrap = document.getElementById('sms-notify-wrap');
 
+            // 1. Handle Expense Mode
             if (!isIncome) {
-                departmentSelect.value = '';
-                departmentSelect.disabled = true;
-                departmentSelect.classList.add('opacity-60', 'cursor-not-allowed');
+                if (departmentSelect) {
+                    departmentSelect.value = '';
+                    departmentSelect.disabled = true;
+                    departmentSelect.classList.add('opacity-60', 'cursor-not-allowed');
+                }
                 if (memberSelect) {
                     memberSelect.value = '';
                     memberSelect.disabled = true;
@@ -493,20 +516,50 @@
                 if (summaryWrap) summaryWrap.classList.add('hidden');
                 if (offeringSubtypeWrap) offeringSubtypeWrap.classList.add('hidden');
                 if (offeringSubtype) offeringSubtype.required = false;
+                if (smsNotifyWrap) smsNotifyWrap.classList.add('hidden');
                 return;
             }
 
+            // 2. Handle SMS Visibility
+            if (smsNotifyWrap) {
+                smsNotifyWrap.classList.toggle('hidden', !canHaveMember);
+            }
+
+            // 3. Handle Offering Subtype Visibility
             if (offeringSubtypeWrap) {
-                if (isOffering) {
-                    offeringSubtypeWrap.classList.remove('hidden');
-                    if (offeringSubtype) offeringSubtype.required = true;
-                } else {
-                    offeringSubtypeWrap.classList.add('hidden');
-                    if (offeringSubtype) offeringSubtype.required = false;
-                }
+                offeringSubtypeWrap.classList.toggle('hidden', !isOffering);
+                if (offeringSubtype) offeringSubtype.required = isOffering;
             }
 
-            if (isIncome && isOffering) {
+            // 4. Reset/Enable Fields based on Category
+            if (requiresDepartment) {
+                departmentSelect.disabled = false;
+                departmentSelect.classList.remove('opacity-60', 'cursor-not-allowed');
+                if (memberSelect) {
+                    memberSelect.value = '';
+                    memberSelect.disabled = true;
+                    memberSelect.classList.add('opacity-60', 'cursor-not-allowed');
+                }
+                if (memberSearch) {
+                    memberSearch.value = '';
+                    memberSearch.disabled = true;
+                    memberSearch.classList.add('opacity-60', 'cursor-not-allowed');
+                }
+            } else if (canHaveMember) {
+                departmentSelect.value = '';
+                departmentSelect.disabled = true;
+                departmentSelect.classList.add('opacity-60', 'cursor-not-allowed');
+                if (memberSelect) {
+                    memberSelect.disabled = false;
+                    memberSelect.classList.remove('opacity-60', 'cursor-not-allowed');
+                }
+                if (memberSearch) {
+                    memberSearch.disabled = false;
+                    memberSearch.classList.remove('opacity-60', 'cursor-not-allowed');
+                    rebuildMemberOptions(baseMemberPlaceholder);
+                }
+            } else {
+                // General Church Income (Offerings/Harvests etc when no member is selected)
                 departmentSelect.value = '';
                 departmentSelect.disabled = true;
                 departmentSelect.classList.add('opacity-60', 'cursor-not-allowed');
@@ -519,83 +572,25 @@
                     memberSearch.value = '';
                     memberSearch.disabled = true;
                     memberSearch.classList.add('opacity-60', 'cursor-not-allowed');
-                    rebuildMemberOptions('');
-                    hideMemberSuggestions();
                 }
-                if (summaryWrap) summaryWrap.classList.add('hidden');
-                return;
             }
 
-            if (isChurchOnlyIncome) {
-                departmentSelect.value = '';
-                departmentSelect.disabled = true;
-                departmentSelect.classList.add('opacity-60', 'cursor-not-allowed');
-                if (memberSelect) {
-                    memberSelect.value = '';
-                    memberSelect.disabled = true;
-                    memberSelect.classList.add('opacity-60', 'cursor-not-allowed');
-                }
-                if (memberSearch) {
-                    memberSearch.value = '';
-                    memberSearch.disabled = true;
-                    memberSearch.classList.add('opacity-60', 'cursor-not-allowed');
-                    rebuildMemberOptions('');
-                    hideMemberSuggestions();
-                }
-                if (summaryWrap) summaryWrap.classList.add('hidden');
-                return;
-            }
-
-            departmentSelect.disabled = false;
-            departmentSelect.classList.remove('opacity-60', 'cursor-not-allowed');
-            if (memberSelect) {
-                memberSelect.disabled = false;
-                memberSelect.classList.remove('opacity-60', 'cursor-not-allowed');
-            }
-            if (memberSearch) {
-                memberSearch.disabled = false;
-                memberSearch.classList.remove('opacity-60', 'cursor-not-allowed');
-            }
-
+            // 5. Special rule for Staff users
             if (isStaff && !requiresDepartment) {
                 departmentSelect.value = '';
                 departmentSelect.disabled = true;
                 departmentSelect.classList.add('opacity-60', 'cursor-not-allowed');
             }
 
-            if (isStaff && memberSelect) {
-                if (requiresMember) {
-                    memberSelect.disabled = false;
-                    memberSelect.classList.remove('opacity-60', 'cursor-not-allowed');
-                    if (memberSearch) {
-                        memberSearch.disabled = false;
-                        memberSearch.classList.remove('opacity-60', 'cursor-not-allowed');
-                    }
-                } else {
+            // 6. Final logic for Dept vs Member exclusivity (for non-staff)
+            if (!isStaff) {
+                const hasDept = String(departmentSelect.value || '') !== '';
+                const hasMember = memberSelect ? String(memberSelect.value || '') !== '' : false;
+                if (hasDept && memberSelect) {
                     memberSelect.value = '';
                     memberSelect.disabled = true;
                     memberSelect.classList.add('opacity-60', 'cursor-not-allowed');
-                    if (memberSearch) {
-                        memberSearch.value = '';
-                        memberSearch.disabled = true;
-                        memberSearch.classList.add('opacity-60', 'cursor-not-allowed');
-                        rebuildMemberOptions('');
-                        hideMemberSuggestions();
-                    }
-                    if (summaryWrap) summaryWrap.classList.add('hidden');
                 }
-            }
-
-            const hasDept = String(departmentSelect.value || '') !== '';
-            const hasMember = memberSelect ? String(memberSelect.value || '') !== '' : false;
-
-            if (hasDept && memberSelect && !isStaff) {
-                memberSelect.value = '';
-                memberSelect.disabled = true;
-                memberSelect.classList.add('opacity-60', 'cursor-not-allowed');
-                if (summaryWrap) summaryWrap.classList.add('hidden');
-            } else if (hasMember && !isStaff) {
-                departmentSelect.value = '';
             }
 
             loadMemberSummary();
