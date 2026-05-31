@@ -1,7 +1,7 @@
 <?php 
     $churchName = AppConfig::getSetting('church_name', 'Church Management');
     $theme = AppConfig::getSetting('theme', 'dark');
-    $theme = in_array($theme, ['dark', 'light', 'ocean', 'sunset'], true) ? $theme : 'dark';
+    $theme = in_array($theme, ['dark', 'light', 'ocean', 'sunset', 'blue'], true) ? $theme : 'dark';
     $logoRelativePath = Branding::getLogoPath();
     $mode = isset($mode) ? (string)$mode : 'login';
     $token = isset($token) ? (string)$token : (string)($_GET['token'] ?? '');
@@ -11,11 +11,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#fbbf24">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="URA CMS">
+    <link rel="manifest" href="/AG/manifest.php">
     <title>Secure Login | <?php echo $churchName; ?></title>
-    <?php if ($logoRelativePath): ?>
-        <link rel="icon" type="image/png" href="<?php echo BASE_URL . '/' . $logoRelativePath; ?>">
-        <link rel="shortcut icon" href="<?php echo BASE_URL . '/' . $logoRelativePath; ?>">
-    <?php endif; ?>
+    
+    <!-- Explicit Icon Links - Guaranteed to work! -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/AG/logo.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/AG/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/AG/icon-512.png">
+    <link rel="shortcut icon" href="/AG/logo.ico">
+    <link rel="apple-touch-icon" href="/AG/logo.png">
+    <link rel="apple-touch-icon-precomposed" href="/AG/logo.png">
+    
+    <!-- Fallback to public/assets/img -->
+    <link rel="icon" type="image/png" href="/AG/public/assets/img/logo.png">
+    <link rel="shortcut icon" href="/AG/public/assets/img/logo.ico">
+    <link rel="apple-touch-icon" href="/AG/public/assets/img/logo.png">
     <script>
         (function () {
             const holidayTheme = (function () {
@@ -85,8 +99,39 @@
 
             try {
                 const t = localStorage.getItem('uiTheme');
-                if (['dark', 'light', 'ocean', 'sunset'].includes(t || '')) {
-                    document.documentElement.setAttribute('data-theme', t);
+                if (['dark', 'light', 'ocean', 'sunset', 'blue', 'custom'].includes(t || '')) {
+                    if (t === 'custom') {
+                        // Load custom theme colors
+                        const savedTheme = localStorage.getItem('uiCustomTheme');
+                        if (savedTheme) {
+                            const theme = JSON.parse(savedTheme);
+                            // Helper to convert hex to rgba
+                            function hexToRgba(hex, alpha = 1) {
+                                const r = parseInt(hex.slice(1, 3), 16);
+                                const g = parseInt(hex.slice(3, 5), 16);
+                                const b = parseInt(hex.slice(5, 7), 16);
+                                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                            }
+                            document.documentElement.setAttribute('data-theme', 'custom');
+                            document.documentElement.style.setProperty('--login-accent', theme.accent);
+                            document.documentElement.style.setProperty('--login-accent-2', theme.accent2);
+                            document.documentElement.style.setProperty('--login-accent-ring', hexToRgba(theme.accent, 0.15));
+                            document.documentElement.style.setProperty('--login-shell-glow', `linear-gradient(135deg, ${hexToRgba(theme.accent, 0.14)}, ${hexToRgba(theme.accent2, 0.1)}, rgba(255, 255, 255, 0.04))`);
+                            document.documentElement.style.setProperty('--login-accent-soft-bg', hexToRgba(theme.accent, 0.10));
+                            document.documentElement.style.setProperty('--login-accent-border', hexToRgba(theme.accent, 0.20));
+                            
+                            // Custom mesh gradient
+                            const meshGrad = `background-color: ${theme.bg};
+                                background-image:
+                                    radial-gradient(at 0% 0%, ${hexToRgba(theme.accent, 0.28)}, transparent 55%),
+                                    radial-gradient(at 100% 0%, ${hexToRgba(theme.accent2, 0.22)}, transparent 55%),
+                                    radial-gradient(at 100% 100%, ${hexToRgba(theme.accent, 0.18)}, transparent 55%),
+                                    radial-gradient(at 0% 100%, ${hexToRgba(theme.accent2, 0.22)}, transparent 55%);`;
+                            document.querySelector('.mesh-gradient').style.cssText = meshGrad;
+                        }
+                    } else {
+                        document.documentElement.setAttribute('data-theme', t);
+                    }
                 }
             } catch (e) {}
         })();
@@ -120,6 +165,24 @@
             --login-shell-glow: linear-gradient(135deg, rgba(251, 113, 133, 0.16), rgba(249, 115, 22, 0.12), rgba(255, 255, 255, 0.04));
             --login-accent-soft-bg: rgba(251, 113, 133, 0.12);
             --login-accent-border: rgba(251, 113, 133, 0.22);
+        }
+
+        html[data-theme="blue"] {
+            --login-accent: #fde047;
+            --login-accent-2: #facc15;
+            --login-accent-ring: rgba(253, 224, 71, 0.25);
+            --login-shell-glow: linear-gradient(135deg, rgba(253, 224, 71, 0.25), rgba(251, 191, 36, 0.18), rgba(255, 255, 255, 0.04));
+            --login-accent-soft-bg: rgba(253, 224, 71, 0.18);
+            --login-accent-border: rgba(253, 224, 71, 0.30);
+        }
+
+        html[data-theme="custom"] {
+            --login-accent: #fbbf24;
+            --login-accent-2: #d97706;
+            --login-accent-ring: rgba(251, 191, 36, 0.15);
+            --login-shell-glow: linear-gradient(135deg, rgba(251, 191, 36, 0.14), rgba(59, 130, 246, 0.1), rgba(255, 255, 255, 0.04));
+            --login-accent-soft-bg: rgba(251, 191, 36, 0.10);
+            --login-accent-border: rgba(251, 191, 36, 0.20);
         }
 
         html[data-theme="christmas"] {
@@ -221,6 +284,16 @@
                 radial-gradient(at 100% 100%, rgba(147, 51, 234, 0.16) 0, transparent 55%),
                 radial-gradient(at 0% 100%, rgba(244, 63, 94, 0.18) 0, transparent 55%);
         }
+
+        html[data-theme="blue"] .mesh-gradient {
+            background-color: #002D66;
+            background-image:
+                radial-gradient(at 0% 0%, rgba(255, 215, 0, 0.45) 0, transparent 55%),
+                radial-gradient(at 100% 0%, rgba(255, 215, 0, 0.4) 0, transparent 55%),
+                radial-gradient(at 100% 100%, rgba(255, 215, 0, 0.35) 0, transparent 55%),
+                radial-gradient(at 0% 100%, rgba(255, 215, 0, 0.38) 0, transparent 55%);
+        }
+
         html[data-theme="christmas"] .mesh-gradient {
             background-color: #05140b;
             background-image:
@@ -303,6 +376,20 @@
             background: rgba(255, 255, 255, 0.68);
             border: 1px solid rgba(15, 23, 42, 0.08);
         }
+        html[data-theme="blue"] .login-card {
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            box-shadow: 0 35px 80px -18px rgba(0, 45, 102, 0.9);
+        }
+        html[data-theme="blue"] .glass-panel {
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 215, 0, 0.18);
+            box-shadow: inset 0 1px 0 rgba(255, 215, 0, 0.1);
+        }
+        html[data-theme="blue"] .bg-white/5 { background-color: rgba(0, 0, 0, 0.35) !important; }
+        html[data-theme="blue"] .bg-white/10 { background-color: rgba(0, 0, 0, 0.55) !important; }
+        html[data-theme="blue"] .border-white/10 { border-color: rgba(255, 215, 0, 0.18) !important; }
+        html[data-theme="blue"] .border-white/20 { border-color: rgba(255, 215, 0, 0.25) !important; }
 
         html[data-theme="christmas"] .login-card,
         html[data-theme="newyear"] .login-card,
@@ -948,9 +1035,9 @@
         </svg>
     </div>
     <div class="page-shell">
-        <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,520px)] lg:gap-8">
+        <div class="grid items-start gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(400px,480px)] lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,520px)] xl:grid-cols-[minmax(0,1.1fr)_minmax(450px,550px)] 2xl:grid-cols-[minmax(0,1.15fr)_minmax(480px,580px)] md:gap-8 2xl:gap-12">
             <section class="brand-panel rounded-[2.4rem] p-6 sm:p-8 lg:p-10">
-                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div class="inline-flex items-center gap-4">
                         <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white/10 backdrop-blur-md rounded-[1.6rem] border border-white/20 shadow-xl overflow-hidden shrink-0">
                             <?php if ($logoRelativePath): ?>
@@ -964,17 +1051,21 @@
                             <h1 class="mt-3 text-2xl sm:text-3xl lg:text-[2.5rem] font-black text-white tracking-tight uppercase leading-tight"><?php echo $churchName; ?></h1>
                         </div>
                     </div>
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
-                        <div class="relative w-full sm:w-auto">
-                            <select id="login-theme-switch" class="w-full sm:w-auto h-11 sm:h-10 rounded-2xl bg-white/5 border border-white/10 px-4 pr-9 text-[10px] font-black uppercase tracking-[0.24em] text-slate-200 outline-none appearance-none cursor-pointer">
+                    <div class="flex flex-wrap gap-3 justify-start sm:justify-end w-full sm:w-auto">
+                        <div class="relative flex-shrink-0">
+                            <select id="login-theme-switch" class="w-full min-w-[140px] h-10 rounded-2xl bg-slate-900 border border-white/10 px-4 pr-9 text-[10px] font-black uppercase tracking-[0.24em] text-slate-200 outline-none appearance-none cursor-pointer">
                                 <option value="dark">Dark</option>
                                 <option value="light">Light</option>
                                 <option value="ocean">Ocean</option>
                                 <option value="sunset">Sunset</option>
+                                <option value="blue">Blue</option>
                             </select>
                             <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
                         </div>
-                        <span class="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-slate-300 w-full sm:w-auto">
+                        <button id="open-custom-theme-btn" class="flex-shrink-0 h-10 rounded-2xl bg-accent text-slate-900 font-black text-[10px] uppercase tracking-[0.24em] hover:scale-[1.01] active:scale-[0.98] transition-all px-4">
+                            Custom Theme
+                        </button>
+                        <span class="flex-shrink-0 inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-slate-300">
                             Upper Room
                         </span>
                     </div>
@@ -1015,6 +1106,38 @@
                         </div>
                         <h3 class="mt-4 text-sm font-black text-white uppercase tracking-[0.18em]">Responsive UI</h3>
                         <p class="mt-2 text-sm text-slate-400 leading-6">Balanced spacing, wider desktop presentation, and stacked mobile sections for a better first impression.</p>
+                    </div>
+                </div>
+
+                <!-- Custom Theme Customizer -->
+                <div id="custom-theme-customizer" class="mt-8 glass-panel rounded-[2rem] p-6 sm:p-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <p class="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Customize Colors</p>
+                        <button id="reset-custom-theme" class="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400 hover:text-white transition-colors">
+                            Reset
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div class="text-center">
+                            <label class="block text-[10px] font-black uppercase tracking-[0.24em] text-slate-400 mb-3">Primary</label>
+                            <input type="color" id="custom-accent-color" value="#fbbf24" class="w-16 h-16 mx-auto rounded-xl cursor-pointer border border-white/10">
+                        </div>
+                        <div class="text-center">
+                            <label class="block text-[10px] font-black uppercase tracking-[0.24em] text-slate-400 mb-3">Secondary</label>
+                            <input type="color" id="custom-accent2-color" value="#d97706" class="w-16 h-16 mx-auto rounded-xl cursor-pointer border border-white/10">
+                        </div>
+                        <div class="text-center">
+                            <label class="block text-[10px] font-black uppercase tracking-[0.24em] text-slate-400 mb-3">Background</label>
+                            <input type="color" id="custom-bg-color" value="#0f172a" class="w-16 h-16 mx-auto rounded-xl cursor-pointer border border-white/10">
+                        </div>
+                    </div>
+                    <div class="mt-8 flex gap-3">
+                        <button id="reset-custom-theme-btn" class="flex-1 h-12 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-black text-[10px] uppercase tracking-[0.24em] hover:bg-white/10 transition-all">
+                            Reset
+                        </button>
+                        <button id="save-custom-theme" class="flex-1 h-12 btn-gradient text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-[0.24em] hover:scale-[1.01] active:scale-[0.98] transition-all">
+                            Save Theme
+                        </button>
                     </div>
                 </div>
             </section>
@@ -1258,19 +1381,159 @@
 
         (function () {
             const select = document.getElementById('login-theme-switch');
-            if (!select) return;
-            const current = (function () {
+            const customizer = document.getElementById('custom-theme-customizer');
+            const customBtn = document.getElementById('open-custom-theme-btn');
+            const accentInput = document.getElementById('custom-accent-color');
+            const accent2Input = document.getElementById('custom-accent2-color');
+            const bgInput = document.getElementById('custom-bg-color');
+            const saveBtn = document.getElementById('save-custom-theme');
+            const resetBtn = document.getElementById('reset-custom-theme-btn');
+            const resetLinkBtn = document.getElementById('reset-custom-theme');
+
+            if (!select || !customizer || !customBtn) return;
+
+            const allowed = ['dark', 'light', 'ocean', 'sunset', 'blue'];
+            const defaultTheme = {
+                accent: '#fbbf24',
+                accent2: '#d97706',
+                bg: '#0f172a'
+            };
+
+            // Helper to convert hex to rgba
+            function hexToRgba(hex, alpha = 1) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+
+            // Apply custom theme
+            function applyCustomTheme(theme) {
+                document.documentElement.setAttribute('data-theme', 'custom');
+                document.documentElement.style.setProperty('--login-accent', theme.accent);
+                document.documentElement.style.setProperty('--login-accent-2', theme.accent2);
+                document.documentElement.style.setProperty('--login-accent-ring', hexToRgba(theme.accent, 0.15));
+                document.documentElement.style.setProperty('--login-shell-glow', `linear-gradient(135deg, ${hexToRgba(theme.accent, 0.14)}, ${hexToRgba(theme.accent2, 0.1)}, rgba(255, 255, 255, 0.04))`);
+                document.documentElement.style.setProperty('--login-accent-soft-bg', hexToRgba(theme.accent, 0.10));
+                document.documentElement.style.setProperty('--login-accent-border', hexToRgba(theme.accent, 0.20));
+
+                // Custom mesh gradient
+                const meshGrad = `background-color: ${theme.bg};
+                    background-image:
+                        radial-gradient(at 0% 0%, ${hexToRgba(theme.accent, 0.28)}, transparent 55%),
+                        radial-gradient(at 100% 0%, ${hexToRgba(theme.accent2, 0.22)}, transparent 55%),
+                        radial-gradient(at 100% 100%, ${hexToRgba(theme.accent, 0.18)}, transparent 55%),
+                        radial-gradient(at 0% 100%, ${hexToRgba(theme.accent2, 0.22)}, transparent 55%);`;
+                document.querySelector('.mesh-gradient').style.cssText = meshGrad;
+            }
+
+            // Load saved custom theme
+            function loadSavedCustomTheme() {
+                try {
+                    const savedTheme = localStorage.getItem('uiCustomTheme');
+                    if (savedTheme) {
+                        return JSON.parse(savedTheme);
+                    }
+                } catch (e) {}
+                return { ...defaultTheme };
+            }
+
+            // Reset custom theme to default
+            function resetCustomTheme() {
+                accentInput.value = defaultTheme.accent;
+                accent2Input.value = defaultTheme.accent2;
+                bgInput.value = defaultTheme.bg;
+                applyCustomTheme(defaultTheme);
+                // Update saved theme to default
+                try {
+                    localStorage.setItem('uiCustomTheme', JSON.stringify(defaultTheme));
+                    localStorage.setItem('uiTheme', 'custom');
+                } catch (e) {}
+            }
+
+            // Initialize
+            let savedTheme = loadSavedCustomTheme();
+            accentInput.value = savedTheme.accent;
+            accent2Input.value = savedTheme.accent2;
+            bgInput.value = savedTheme.bg;
+
+            const currentUiTheme = (function () {
                 try { return localStorage.getItem('uiTheme') || ''; } catch (e) { return ''; }
             })();
-            const allowed = ['dark', 'light', 'ocean', 'sunset'];
-            if (allowed.includes(current)) select.value = current;
-            else select.value = document.documentElement.getAttribute('data-theme') || 'dark';
+            
+            if (currentUiTheme === 'custom') {
+                applyCustomTheme(savedTheme);
+                customizer.classList.remove('hidden');
+            } else if (allowed.includes(currentUiTheme)) {
+                select.value = currentUiTheme;
+                document.documentElement.setAttribute('data-theme', currentUiTheme);
+            } else {
+                select.value = document.documentElement.getAttribute('data-theme') || 'dark';
+            }
+
+            // Theme switch change handler
             select.addEventListener('change', function () {
                 const next = select.value;
-                if (!allowed.includes(next)) return;
-                try { localStorage.setItem('uiTheme', next); } catch (e) {}
-                document.documentElement.setAttribute('data-theme', next);
+                if (allowed.includes(next)) {
+                    customizer.classList.add('hidden');
+                    try { localStorage.setItem('uiTheme', next); } catch (e) {}
+                    document.documentElement.setAttribute('data-theme', next);
+                    // Reset mesh gradient to default
+                    document.querySelector('.mesh-gradient').style.cssText = '';
+                }
             });
+
+            // Custom theme button click handler
+            customBtn.addEventListener('click', function () {
+                customizer.classList.toggle('hidden');
+                if (!customizer.classList.contains('hidden')) {
+                    savedTheme = loadSavedCustomTheme();
+                    applyCustomTheme(savedTheme);
+                }
+            });
+
+            // Reset button click handlers
+            if (resetBtn) {
+                resetBtn.addEventListener('click', resetCustomTheme);
+            }
+            if (resetLinkBtn) {
+                resetLinkBtn.addEventListener('click', resetCustomTheme);
+            }
+
+            // Color input change handlers (live preview)
+            [accentInput, accent2Input, bgInput].forEach(input => {
+                input.addEventListener('input', () => {
+                    applyCustomTheme({
+                        accent: accentInput.value,
+                        accent2: accent2Input.value,
+                        bg: bgInput.value
+                    });
+                });
+            });
+
+            // Save button handler
+            saveBtn.addEventListener('click', () => {
+                const themeToSave = {
+                    accent: accentInput.value,
+                    accent2: accent2Input.value,
+                    bg: bgInput.value
+                };
+                try {
+                    localStorage.setItem('uiCustomTheme', JSON.stringify(themeToSave));
+                    localStorage.setItem('uiTheme', 'custom');
+                    savedTheme = themeToSave;
+                    // Show a small confirmation
+                    saveBtn.textContent = 'Saved!';
+                    setTimeout(() => {
+                        saveBtn.textContent = 'Save Theme';
+                    }, 1500);
+                } catch (e) {}
+            });
+
+            // Also load custom theme on initial load if uiTheme is custom
+            if (currentUiTheme === 'custom') {
+                applyCustomTheme(savedTheme);
+            }
         })();
 
         (function () {
@@ -1576,6 +1839,44 @@
 
             document.querySelectorAll('input[type="password"]').forEach(decorate);
         })();
+    </script>
+    <button id="install-app-btn" class="fixed top-4 right-4 z-50 hidden px-4 py-3 rounded-2xl bg-amber-400 text-slate-900 font-black text-xs uppercase tracking-[0.2em] hover:shadow-lg hover:shadow-amber-400/30 active:scale-95 transition-all">
+        <i class="fas fa-download mr-2"></i>Install App
+    </button>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/AG/sw.js')
+                    .then(function (registration) {
+                        console.log('ServiceWorker registration successful');
+                    }, function (err) {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+
+        let deferredPrompt;
+        const installBtn = document.getElementById('install-app-btn');
+
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (installBtn) {
+                installBtn.classList.remove('hidden');
+            }
+        });
+
+        if (installBtn) {
+            installBtn.addEventListener('click', async function () {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log('User response to install prompt: ' + outcome);
+                    deferredPrompt = null;
+                    installBtn.classList.add('hidden');
+                }
+            });
+        }
     </script>
 </body>
 </html>

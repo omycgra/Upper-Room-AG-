@@ -7,6 +7,30 @@
 // Define root path
 define('ROOT_PATH', __DIR__);
 
+#region debug-point A:index-start
+(function() {
+    $envPath = ROOT_PATH . '/.dbg/slow-page-load.env';
+    $serverUrl = 'http://127.0.0.1:7777/event';
+    $sessionId = 'slow-page-load';
+    if (file_exists($envPath)) {
+        $env = parse_ini_file($envPath);
+        if (isset($env['DEBUG_SERVER_URL'])) $serverUrl = $env['DEBUG_SERVER_URL'];
+        if (isset($env['DEBUG_SESSION_ID'])) $sessionId = $env['DEBUG_SESSION_ID'];
+    }
+    $data = json_encode([
+        'sessionId' => $sessionId,
+        'runId' => 'pre',
+        'hypothesisId' => 'A',
+        'location' => 'index.php:1',
+        'msg' => '[DEBUG] Request started',
+        'data' => ['uri' => $_SERVER['REQUEST_URI'] ?? ''],
+        'ts' => microtime(true) * 1000
+    ]);
+    $opts = ['http' => ['method' => 'POST', 'header' => 'Content-Type: application/json', 'content' => $data, 'timeout' => 0.5]];
+    @file_get_contents($serverUrl, false, stream_context_create($opts));
+})();
+#endregion
+
 require_once ROOT_PATH . '/app/Helpers/Env.php';
 Env::load(ROOT_PATH . '/.env');
 

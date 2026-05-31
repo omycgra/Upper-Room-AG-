@@ -63,7 +63,7 @@ class ReportController extends BaseController {
         $totals = $this->getDashboardTotals($db);
         $totals['balance'] = $totals['income'] - $totals['expenses'];
 
-        $currency = strtoupper(trim(($db->fetch("SELECT value FROM settings WHERE key_name = 'finance_currency'")['value'] ?? 'GHS')));
+        $currency = strtoupper(trim((string)(AppConfig::getSetting('finance_currency', 'GHS'))));
         if (!preg_match('/^[A-Z]{2,5}$/', $currency)) $currency = 'GHS';
 
         View::render('reports.index', [

@@ -25,11 +25,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#fbbf24">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Church CMS">
+    <link rel="manifest" href="/AG/manifest.php">
     <title><?php echo $title ?? 'Dashboard'; ?> | CMS Admin</title>
-    <?php if ($logoRelativePath): ?>
-        <link rel="icon" type="image/png" href="<?php echo BASE_URL . '/' . $logoRelativePath; ?>">
-        <link rel="shortcut icon" href="<?php echo BASE_URL . '/' . $logoRelativePath; ?>">
-    <?php endif; ?>
+    
+    <!-- Explicit Icon Links - Guaranteed to work! -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/AG/logo.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/AG/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/AG/icon-512.png">
+    <link rel="shortcut icon" href="/AG/logo.ico">
+    <link rel="apple-touch-icon" href="/AG/logo.png">
+    <link rel="apple-touch-icon-precomposed" href="/AG/logo.png">
+    
+    <!-- Fallback to public/assets/img -->
+    <link rel="icon" type="image/png" href="/AG/public/assets/img/logo.png">
+    <link rel="shortcut icon" href="/AG/public/assets/img/logo.ico">
+    <link rel="apple-touch-icon" href="/AG/public/assets/img/logo.png">
     <script>
         (function () {
             const holidayTheme = (function () {
@@ -99,7 +113,7 @@
 
             try {
                 const t = localStorage.getItem('uiTheme');
-                if (['dark', 'light', 'ocean', 'sunset'].includes(t || '')) {
+                if (['dark', 'light', 'ocean', 'sunset', 'blue'].includes(t || '')) {
                     document.documentElement.setAttribute('data-theme', t);
                 }
             } catch (e) {}
@@ -126,15 +140,33 @@
         }
 
         html[data-theme="light"] {
-            --sidebar-bg: rgba(255, 255, 255, 0.85);
-            --card-glass: rgba(255, 255, 255, 0.78);
-            --border-glass: rgba(15, 23, 42, 0.12);
+            --sidebar-bg: rgba(255, 255, 255, 0.9);
+            --card-glass: rgba(15, 23, 42, 0.08);
+            --border-glass: rgba(15, 23, 42, 0.2);
             --text-color: #0f172a;
-            --body-bg: radial-gradient(circle at top right, #ffffff, #f1f5f9);
-            --select-bg: rgba(255, 255, 255, 0.95);
+            --body-bg: radial-gradient(circle at top right, #f8fafc, #e2e8f0);
+            --select-bg: rgba(255, 255, 255, 0.98);
             --select-text: #0f172a;
             --select-option-bg: #ffffff;
             --select-option-text: #0f172a;
+            --primary-dark: #0f172a;
+        }
+
+        html[data-theme="blue"] {
+            --primary-accent: #FFD700;
+            --accent-glow: rgba(255, 215, 0, 0.75);
+            --sphere-glow-strong: rgba(255, 215, 0, 0.45);
+            --sphere-glow-soft: rgba(255, 215, 0, 0.18);
+            --sidebar-bg: #002D66;
+            --card-glass: rgba(0, 0, 0, 0.45);
+            --border-glass: rgba(255, 215, 0, 0.35);
+            --text-color: #ffffff;
+            --body-bg: radial-gradient(circle at top right, #003D8A, #002D66);
+            --select-bg: rgba(0, 45, 102, 0.9);
+            --select-text: #ffffff;
+            --select-option-bg: #002D66;
+            --select-option-text: #ffffff;
+            --primary-dark: #002D66;
         }
 
         html[data-theme="ocean"] {
@@ -266,6 +298,10 @@
 
         html[data-theme="light"] .live-bg {
             background: linear-gradient(125deg, #ffffff 0%, #f1f5f9 50%, #e2e8f0 100%);
+        }
+
+        html[data-theme="blue"] .live-bg {
+            background: linear-gradient(125deg, #002D66 0%, #003D8A 50%, #002D66 100%);
         }
 
         html[data-theme="ocean"] .live-bg {
@@ -1028,7 +1064,7 @@
             <div class="px-6 pb-6 pt-2 lg:p-8 lg:pt-0 flex flex-col items-center border-b border-white/5">
                 <div class="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-xl shadow-yellow-500/20 overflow-hidden bg-transparent border border-white/10">
                     <?php if ($logoRelativePath): ?>
-                        <img src="<?php echo BASE_URL . '/' . $logoRelativePath; ?>" alt="Logo" class="w-full h-full object-contain bg-transparent p-1">
+                        <img src="<?php echo BASE_URL . '/' . $logoRelativePath; ?>" alt="Logo" class="w-full h-full object-cover bg-transparent">
                     <?php else: ?>
                         <div class="w-full h-full flex items-center justify-center bg-accent">
                             <i class="fas fa-church text-slate-900 text-3xl"></i>
@@ -1220,6 +1256,9 @@
                         <h1 class="text-base sm:text-lg font-black tracking-tight uppercase text-accent"><?php echo $title ?? 'Dashboard'; ?></h1>
                     </div>
                     <div class="flex items-center justify-between gap-3 sm:justify-end sm:gap-4 lg:gap-6">
+                        <button id="install-app-btn" class="hidden w-auto px-4 py-3 rounded-2xl bg-accent text-slate-900 font-black text-xs uppercase tracking-[0.2em] hover-glow-yellow active:scale-95 transition-all">
+                            <i class="fas fa-download mr-2"></i>Install App
+                        </button>
                         <div class="flex min-w-0 items-center space-x-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 sm:px-4">
                             <span class="hidden truncate text-xs font-bold text-slate-300 sm:inline"><?php echo Session::get('user_name', 'Admin'); ?></span>
                             <span class="truncate text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Profile</span>
@@ -3065,5 +3104,40 @@
         </script>
         <?php Session::remove('just_logged_in'); ?>
     <?php endif; ?>
+    <script>
+        let deferredPrompt;
+        const installBtn = document.getElementById('install-app-btn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (installBtn) {
+                installBtn.classList.remove('hidden');
+            }
+        });
+
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log(`User response to install prompt: ${outcome}`);
+                    deferredPrompt = null;
+                    installBtn.classList.add('hidden');
+                }
+            });
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/AG/sw.js')
+                    .then(function(registration) {
+                        console.log('ServiceWorker registration successful');
+                    }, function(err) {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>

@@ -273,6 +273,9 @@ class DashboardController extends BaseController {
                 'total_members' => $memberStats['total'],
                 'recent_growth' => $memberStats['new'],
                 'attendance_rate' => $attendanceModel->getAttendanceRate(),
+                'today_attendance_rate' => $attendanceModel->getTodayAttendanceRate(),
+                'weekly_attendance_rate' => $attendanceModel->getWeeklyAttendanceRate(),
+                'monthly_attendance_rate' => $attendanceModel->getMonthlyAttendanceRate(),
                 'monthly_donations' => '$' . number_format($financeModel->getMonthlyTotal(), 2),
                 'birthday_count' => $memberModel->getBirthdayCountThisMonth()
             ],

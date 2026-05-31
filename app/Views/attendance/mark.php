@@ -73,9 +73,9 @@
                     <i class="fas fa-church absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
                     <select name="service_type" required class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-10 py-4 text-xs font-black text-slate-200 transition-all outline-none appearance-none cursor-pointer">
                         <option value="Sunday Service">Sunday Service</option>
-                        <option value="Mid-week Service">Mid-week Service</option>
-                        <option value="Youth Meeting">Youth Meeting</option>
-                        <option value="Special Event">Special Event</option>
+                        <option value="Midweek Service">Midweek Service</option>
+                        <option value="Youth Service">Youth Service</option>
+                        <option value="Children Service">Children Service</option>
                     </select>
                     <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] pointer-events-none"></i>
                 </div>

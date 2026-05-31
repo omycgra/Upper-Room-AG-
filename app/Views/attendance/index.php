@@ -3,7 +3,7 @@
     $mode = strtolower(trim((string)($attendance_mode ?? 'manual')));
     if (!in_array($mode, ['manual', 'biotime', 'qrcode', 'link'], true)) $mode = 'manual';
     $modeLabel = $mode === 'biotime' ? 'BioTime' : ($mode === 'qrcode' ? 'QR Code' : ($mode === 'link' ? 'Link' : 'Manual'));
-    $serviceTypes = ['Sunday Service', 'Mid-week Service', 'Youth Meeting', 'Special Event'];
+    $serviceTypes = ['Sunday Service', 'Midweek Service', 'Youth Service', 'Children Service'];
     $canManage = !empty($can_manage_attendance);
     $canDownload = !empty($can_download_attendance);
     $pageRoute = trim((string)($attendance_page_route ?? 'attendance'));
@@ -43,7 +43,19 @@
                 <i class="fas fa-gear mr-2"></i> Settings
             </a>
         <?php elseif (in_array($mode, ['qrcode', 'link'], true) && $canManage): ?>
-            <a id="quick-open-btn" href="<?php echo BASE_URL; ?>/attendance/quick?<?php echo http_build_query(['service_date' => date('Y-m-d'), 'service_type' => 'Sunday Service']); ?>" class="glass-card flex items-center px-6 py-3.5 rounded-2xl bg-accent text-slate-900 font-black text-xs uppercase tracking-widest hover:scale-[1.03] transition-all shadow-xl shadow-yellow-500/20">
+            <?php
+                // Build quick URL with custom public URL if available
+                $quickUrlBase = BASE_URL;
+                $customPublicUrl = trim((string)($custom_public_url ?? ''));
+                if ($customPublicUrl !== '') {
+                    $quickUrlBase = rtrim($customPublicUrl, '/');
+                    if (!preg_match('#^https?://#i', $quickUrlBase)) {
+                        $quickUrlBase = 'https://' . $quickUrlBase;
+                    }
+                }
+                $quickAttendanceUrl = $quickUrlBase . '/attendance/quick?' . http_build_query(['service_date' => date('Y-m-d'), 'service_type' => 'Sunday Service']);
+            ?>
+            <a id="quick-open-btn" href="<?php echo $quickAttendanceUrl; ?>" class="glass-card flex items-center px-6 py-3.5 rounded-2xl bg-accent text-slate-900 font-black text-xs uppercase tracking-widest hover:scale-[1.03] transition-all shadow-xl shadow-yellow-500/20">
                 <i class="fas fa-bolt mr-2"></i> Quick Mark
             </a>
         <?php endif; ?>
@@ -51,14 +63,31 @@
 </div>
 
 <?php if (!$serviceOnly): ?>
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-6 lg:gap-8 mb-8">
+    <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 border-white/5 card-interaction">
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Today's Rate</p>
+        <div class="mt-4 text-4xl font-black text-white tracking-tight"><?php echo htmlspecialchars((string)($today_attendance_rate ?? '0%')); ?></div>
+        <p class="mt-3 text-xs font-black uppercase tracking-widest text-slate-500">Service date: <?php echo htmlspecialchars(date('Y-m-d')); ?></p>
+    </div>
+    <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 border-white/5 card-interaction">
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Weekly Rate</p>
+        <div class="mt-4 text-4xl font-black text-white tracking-tight"><?php echo htmlspecialchars((string)($weekly_attendance_rate ?? '0%')); ?></div>
+        <p class="mt-3 text-xs font-black uppercase tracking-widest text-slate-500">Week starting: <?php echo htmlspecialchars(date('Y-m-d', strtotime('monday this week'))); ?></p>
+    </div>
+    <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 border-white/5 card-interaction">
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Monthly Rate</p>
+        <div class="mt-4 text-4xl font-black text-white tracking-tight"><?php echo htmlspecialchars((string)($monthly_attendance_rate ?? '0%')); ?></div>
+        <p class="mt-3 text-xs font-black uppercase tracking-widest text-slate-500">Month starting: <?php echo htmlspecialchars(date('Y-m-01')); ?></p>
+    </div>
     <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 border-white/5 card-interaction">
         <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Avg. Attendance Rate</p>
         <div class="mt-4 text-4xl font-black text-white tracking-tight"><?php echo htmlspecialchars((string)($attendance_rate ?? '0%')); ?></div>
         <p class="mt-3 text-xs font-black uppercase tracking-widest text-slate-500">Last 30 days</p>
     </div>
+</div>
 
-    <div class="lg:col-span-2 glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
+<div class="grid grid-cols-1 lg:grid-cols-1 gap-6 lg:gap-8 mb-8">
+    <div class="glass-card rounded-[2.5rem] sm:rounded-[3rem] border-white/5 overflow-hidden card-interaction">
         <div class="px-6 sm:px-8 lg:px-10 py-6 sm:py-8 border-b border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/[0.02]">
             <div class="flex items-center">
                 <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
@@ -230,16 +259,18 @@
                             const d = dateEl.value || '<?php echo date('Y-m-d'); ?>';
                             const t = typeEl.value || 'Sunday Service';
                             const qs = new URLSearchParams({ service_date: d, service_type: t }).toString();
-                            const base = '<?php echo rtrim((string)BASE_URL, '/'); ?>';
+                            const customUrl = '<?php echo rtrim((string)($custom_public_url ?? ''), '/'); ?>';
+                            let basePath = '<?php echo rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/'); ?>';
                             let origin = window.location.origin;
                             try {
                                 const host = (window.location.hostname || '').toLowerCase();
-                                if ((host === 'localhost' || host === '127.0.0.1') && '<?php echo $lanIp; ?>' !== '') {
+                                if (customUrl !== '') {
+                                    origin = customUrl;
+                                } else if ((host === 'localhost' || host === '127.0.0.1') && '<?php echo $lanIp; ?>' !== '') {
                                     origin = window.location.protocol + '//' + '<?php echo $lanIp; ?>' + (window.location.port ? (':' + window.location.port) : '');
                                 }
                             } catch (e) {}
-                            const baseAbs = (base.startsWith('http://') || base.startsWith('https://')) ? base : (origin + base);
-                            return baseAbs + '/attendance/quick?' + qs;
+                            return origin + basePath + '/attendance/quick?' + qs;
                         };
 
                         const apply = () => {
@@ -384,7 +415,7 @@
             <div>
                 <h4 class="text-xl font-black text-white tracking-tight">Service Attendance</h4>
                     <p class="text-slate-500 font-black mt-2 uppercase tracking-widest text-[10px]">
-                        Present (7:00–10:30) • Late (10:31–12:00) • Absent (after 12:00)
+                        Present (<?php echo htmlspecialchars($formatted_service_times['present_start']); ?>–<?php echo htmlspecialchars($formatted_service_times['present_end']); ?>) • Late (<?php echo htmlspecialchars($formatted_service_times['late_start']); ?>–<?php echo htmlspecialchars($formatted_service_times['late_end']); ?>) • Absent (after <?php echo htmlspecialchars($formatted_service_times['late_end']); ?>)
                         <?php if ($selectedDeptId > 0): ?>
                             • Department: <span class="text-slate-300"><?php echo htmlspecialchars($selectedDeptName !== '' ? $selectedDeptName : ('#' . $selectedDeptId)); ?></span>
                         <?php endif; ?>

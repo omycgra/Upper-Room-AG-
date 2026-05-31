@@ -50,7 +50,7 @@ class PastorController extends BaseController {
 
         $upcomingBirthdays = $memberModel->getUpcomingBirthdays(12);
 
-        $currency = strtoupper(trim((string)($db->fetch("SELECT value FROM settings WHERE key_name = 'finance_currency'")['value'] ?? 'GHS')));
+        $currency = strtoupper(trim((string)(AppConfig::getSetting('finance_currency', 'GHS'))));
         if (!preg_match('/^[A-Z]{2,5}$/', $currency)) $currency = 'GHS';
 
         View::render('pastor.index', [

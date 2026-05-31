@@ -332,6 +332,7 @@ function ensureDefaultAdmin($db, array &$messages, string $adminUsername, string
 
 function renderSetupPage(array $data): void
 {
+    global $appBaseUrl;
     $success = (bool)($data['success'] ?? false);
     $messages = $data['messages'] ?? [];
     $errors = $data['errors'] ?? [];

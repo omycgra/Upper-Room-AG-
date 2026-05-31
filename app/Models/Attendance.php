@@ -101,4 +101,40 @@ class Attendance extends BaseModel {
         $result = $this->db->fetch($sql, [$cutoffDate, $cutoffDate]);
         return ($result && $result['rate'] !== null) ? round($result['rate'], 2) . '%' : '0%';
     }
+
+    public function getTodayAttendanceRate() {
+        $today = date('Y-m-d');
+        $sql = "SELECT
+                COALESCE(
+                    (SELECT COUNT(*) FROM attendance WHERE status = 'Present' AND service_date = ?) /
+                    NULLIF((SELECT COUNT(*) FROM attendance WHERE service_date = ?), 0) * 100,
+                    0
+                ) as rate";
+        $result = $this->db->fetch($sql, [$today, $today]);
+        return ($result && $result['rate'] !== null) ? round($result['rate'], 2) . '%' : '0%';
+    }
+
+    public function getWeeklyAttendanceRate() {
+        $startOfWeek = date('Y-m-d', strtotime('monday this week'));
+        $sql = "SELECT
+                COALESCE(
+                    (SELECT COUNT(*) FROM attendance WHERE status = 'Present' AND service_date >= ?) /
+                    NULLIF((SELECT COUNT(*) FROM attendance WHERE service_date >= ?), 0) * 100,
+                    0
+                ) as rate";
+        $result = $this->db->fetch($sql, [$startOfWeek, $startOfWeek]);
+        return ($result && $result['rate'] !== null) ? round($result['rate'], 2) . '%' : '0%';
+    }
+
+    public function getMonthlyAttendanceRate() {
+        $startOfMonth = date('Y-m-01');
+        $sql = "SELECT
+                COALESCE(
+                    (SELECT COUNT(*) FROM attendance WHERE status = 'Present' AND service_date >= ?) /
+                    NULLIF((SELECT COUNT(*) FROM attendance WHERE service_date >= ?), 0) * 100,
+                    0
+                ) as rate";
+        $result = $this->db->fetch($sql, [$startOfMonth, $startOfMonth]);
+        return ($result && $result['rate'] !== null) ? round($result['rate'], 2) . '%' : '0%';
+    }
 }

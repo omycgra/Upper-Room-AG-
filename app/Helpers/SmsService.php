@@ -262,14 +262,7 @@ class SmsService {
     }
 
     private function getSetting($db, $key, $default = '') {
-        try {
-            $row = $db->fetch("SELECT value FROM settings WHERE key_name = ?", [$key]);
-            if ($row && array_key_exists('value', $row) && $row['value'] !== null) {
-                return (string)$row['value'];
-            }
-        } catch (Exception $e) {
-        }
-        return $default;
+        return AppConfig::getSetting($key, $default);
     }
 
     private function upsertSetting($db, $key, $value) {

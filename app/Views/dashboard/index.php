@@ -156,11 +156,8 @@
                     <?php endif; ?>
                 </div>
             </div>
-                </div>
-            </div>
-                </div>
-            </div>
-
+        </div>
+        <div class="lg:col-span-2 space-y-8">
             <div class="glass-card rounded-[3rem] border-white/5 overflow-hidden">
                 <div class="px-10 py-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
                     <div class="flex items-center">
@@ -198,38 +195,38 @@
                     <?php endif; ?>
                 </div>
             </div>
-        </div>
 
-        <div class="lg:col-span-2 glass-card rounded-[3rem] border-white/5 overflow-hidden">
-            <div class="px-10 py-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
-                        <i class="fas fa-receipt text-accent text-sm"></i>
-                    </div>
-                    <h4 class="text-xl font-black text-white tracking-tight">Bank Transactions</h4>
-                </div>
-                <a href="<?php echo BASE_URL; ?>/finance" class="text-[10px] font-black uppercase tracking-widest text-accent hover:underline">View all</a>
-            </div>
-            <div class="p-5 sm:p-6 lg:p-10 space-y-3">
-                <?php if (empty($deptTx)): ?>
-                    <div class="text-center text-slate-500 font-bold italic py-10">No department bank transactions recorded yet.</div>
-                <?php else: ?>
-                    <?php foreach (array_slice($deptTx, 0, 12) as $tx): ?>
-                        <?php $isExpense = ($tx['transaction_type'] ?? '') === 'Expense'; ?>
-                        <div class="glass-card p-5 rounded-2xl border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/5 transition-all">
-                            <div>
-                                <p class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($tx['transaction_type'] ?? ''); ?></p>
-                                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1"><?php echo htmlspecialchars(date('M d, Y', strtotime($tx['transaction_date']))); ?></p>
-                            </div>
-                            <div class="text-left sm:text-right">
-                                <p class="text-sm font-black <?php echo $isExpense ? 'text-rose-400' : 'text-emerald-400'; ?>">
-                                    <?php echo ($isExpense ? '-' : '') . $financeCurrency . ' ' . number_format((float)($tx['amount'] ?? 0), 2); ?>
-                                </p>
-                                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1"><?php echo htmlspecialchars($tx['payment_method'] ?? ''); ?></p>
-                            </div>
+            <div class="glass-card rounded-[3rem] border-white/5 overflow-hidden">
+                <div class="px-10 py-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mr-4 border border-accent/20">
+                            <i class="fas fa-receipt text-accent text-sm"></i>
                         </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+                        <h4 class="text-xl font-black text-white tracking-tight">Bank Transactions</h4>
+                    </div>
+                    <a href="<?php echo BASE_URL; ?>/finance" class="text-[10px] font-black uppercase tracking-widest text-accent hover:underline">View all</a>
+                </div>
+                <div class="p-5 sm:p-6 lg:p-10 space-y-3">
+                    <?php if (empty($deptTx)): ?>
+                        <div class="text-center text-slate-500 font-bold italic py-10">No department bank transactions recorded yet.</div>
+                    <?php else: ?>
+                        <?php foreach (array_slice($deptTx, 0, 12) as $tx): ?>
+                            <?php $isExpense = ($tx['transaction_type'] ?? '') === 'Expense'; ?>
+                            <div class="glass-card p-5 rounded-2xl border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/5 transition-all">
+                                <div>
+                                    <p class="text-sm font-black text-slate-200"><?php echo htmlspecialchars($tx['transaction_type'] ?? ''); ?></p>
+                                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1"><?php echo htmlspecialchars(date('M d, Y', strtotime($tx['transaction_date']))); ?></p>
+                                </div>
+                                <div class="text-left sm:text-right">
+                                    <p class="text-sm font-black <?php echo $isExpense ? 'text-rose-400' : 'text-emerald-400'; ?>">
+                                        <?php echo ($isExpense ? '-' : '') . $financeCurrency . ' ' . number_format((float)($tx['amount'] ?? 0), 2); ?>
+                                    </p>
+                                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1"><?php echo htmlspecialchars($tx['payment_method'] ?? ''); ?></p>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
@@ -1080,7 +1077,7 @@
 </div>
 
 <!-- Stat Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 mb-12">
     <!-- Members Card -->
     <div class="glass-card relative overflow-hidden rounded-[2.5rem] p-8 group border-white/5 card-interaction">
         <div class="relative z-10">
@@ -1097,46 +1094,64 @@
         <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all"></div>
     </div>
 
-    <!-- New Members Card -->
+    <!-- Today's Attendance -->
     <div class="glass-card relative overflow-hidden rounded-[2.5rem] p-8 group border-white/5 card-interaction">
         <div class="relative z-10">
             <div class="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-8 border border-white/10 group-hover:bg-blue-500 transition-all duration-500">
-                <i class="fas fa-user-plus text-slate-400 group-hover:text-white text-xl transition-colors"></i>
+                <i class="fas fa-calendar-day text-slate-400 group-hover:text-white text-xl transition-colors"></i>
             </div>
-            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Recent Growth</p>
-            <h3 class="text-4xl font-black mt-2 text-white"><?php echo (int)($stats['recent_growth'] ?? 0); ?></h3>
-            <div class="mt-8 flex items-center justify-between">
-                <span class="text-[10px] font-black uppercase tracking-widest text-slate-500 italic">Last 30 days</span>
-                <div class="flex -space-x-2">
-                    <div class="w-6 h-6 rounded-full border-2 border-slate-900 bg-slate-700"></div>
-                    <div class="w-6 h-6 rounded-full border-2 border-slate-900 bg-slate-600"></div>
-                    <div class="w-6 h-6 rounded-full border-2 border-slate-900 bg-accent"></div>
+            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Today's Attendance</p>
+            <h3 class="text-4xl font-black mt-2 text-white"><?php echo $stats['today_attendance_rate']; ?>%</h3>
+            <div class="mt-8">
+                <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                    <div class="bg-blue-500 h-full rounded-full" style="width: <?php echo $stats['today_attendance_rate']; ?>%"></div>
                 </div>
+                <p class="text-[9px] font-black text-slate-500 uppercase mt-2 tracking-widest">Today's Services</p>
             </div>
         </div>
+        <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl group-hover:bg-blue-500/10 transition-all"></div>
     </div>
 
-    <!-- Financial Card -->
+    <!-- Weekly Attendance -->
     <div class="glass-card relative overflow-hidden rounded-[2.5rem] p-8 group border-white/5 card-interaction">
         <div class="relative z-10">
             <div class="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-8 border border-white/10 group-hover:bg-green-500 transition-all duration-500">
-                <i class="fas fa-wallet text-slate-400 group-hover:text-white text-xl transition-colors"></i>
+                <i class="fas fa-calendar-week text-slate-400 group-hover:text-white text-xl transition-colors"></i>
             </div>
-            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Monthly Revenue</p>
-            <h3 class="text-3xl font-black mt-2 text-accent tracking-tighter"><?php echo $stats['monthly_donations']; ?></h3>
+            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Weekly Attendance</p>
+            <h3 class="text-4xl font-black mt-2 text-white"><?php echo $stats['weekly_attendance_rate']; ?>%</h3>
             <div class="mt-8">
                 <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-                    <div class="bg-accent h-full rounded-full" style="width: 75%"></div>
+                    <div class="bg-green-500 h-full rounded-full" style="width: <?php echo $stats['weekly_attendance_rate']; ?>%"></div>
                 </div>
-                <p class="text-[9px] font-black text-slate-500 uppercase mt-2 tracking-widest">75% of target</p>
+                <p class="text-[9px] font-black text-slate-500 uppercase mt-2 tracking-widest">This Week</p>
             </div>
         </div>
+        <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-green-500/5 rounded-full blur-3xl group-hover:bg-green-500/10 transition-all"></div>
+    </div>
+
+    <!-- Monthly Attendance -->
+    <div class="glass-card relative overflow-hidden rounded-[2.5rem] p-8 group border-white/5 card-interaction">
+        <div class="relative z-10">
+            <div class="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-8 border border-white/10 group-hover:bg-purple-500 transition-all duration-500">
+                <i class="fas fa-calendar-alt text-slate-400 group-hover:text-white text-xl transition-colors"></i>
+            </div>
+            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Monthly Attendance</p>
+            <h3 class="text-4xl font-black mt-2 text-white"><?php echo $stats['monthly_attendance_rate']; ?>%</h3>
+            <div class="mt-8">
+                <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                    <div class="bg-purple-500 h-full rounded-full" style="width: <?php echo $stats['monthly_attendance_rate']; ?>%"></div>
+                </div>
+                <p class="text-[9px] font-black text-slate-500 uppercase mt-2 tracking-widest">This Month</p>
+            </div>
+        </div>
+        <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl group-hover:bg-purple-500/10 transition-all"></div>
     </div>
 
     <!-- Birthdays Card -->
     <div class="glass-card relative overflow-hidden rounded-[2.5rem] p-8 group border-white/5 card-interaction">
         <div class="relative z-10">
-            <div class="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-8 border border-white/10 group-hover:bg-purple-500 transition-all duration-500">
+            <div class="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-8 border border-white/10 group-hover:bg-pink-500 transition-all duration-500">
                 <i class="fas fa-gift text-slate-400 group-hover:text-white text-xl transition-colors"></i>
             </div>
             <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Celebrations</p>
@@ -1147,6 +1162,7 @@
                 </button>
             </div>
         </div>
+        <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-pink-500/5 rounded-full blur-3xl group-hover:bg-pink-500/10 transition-all"></div>
     </div>
 </div>
 

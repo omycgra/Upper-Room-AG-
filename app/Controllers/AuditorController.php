@@ -31,7 +31,7 @@ class AuditorController extends BaseController {
         $departmentSavings = $financeModel->getDepartmentSavingsSummary($month, $year, null, null);
 
         $db = Database::getInstance();
-        $currency = strtoupper(trim((string)($db->fetch("SELECT value FROM settings WHERE key_name = 'finance_currency'")['value'] ?? 'GHS')));
+        $currency = strtoupper(trim((string)(AppConfig::getSetting('finance_currency', 'GHS'))));
         if (!preg_match('/^[A-Z]{2,5}$/', $currency)) $currency = 'GHS';
 
         View::render('auditor.index', [

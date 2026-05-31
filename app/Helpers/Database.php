@@ -14,6 +14,10 @@ class Database {
     private $schema;
     private $sslMode;
     private $dsn;
+    
+    // Cache for table/column existence to avoid repeated information_schema queries
+    private static $tableExistsCache = [];
+    private static $columnExistsCache = [];
 
     private function __construct() {
         $driver = strtolower((string)Env::get('DB_DRIVER', 'mysql'));
@@ -96,6 +100,11 @@ class Database {
     }
 
     public function tableExists($tableName) {
+        $cacheKey = $tableName;
+        if (isset(self::$tableExistsCache[$cacheKey])) {
+            return self::$tableExistsCache[$cacheKey];
+        }
+        
         $row = $this->fetch(
             "SELECT COUNT(*) AS c
              FROM information_schema.tables
@@ -104,10 +113,17 @@ class Database {
             [$this->isPgsql() ? $this->schema : $this->db, $tableName]
         );
 
-        return (int)($row['c'] ?? 0) > 0;
+        $result = (int)($row['c'] ?? 0) > 0;
+        self::$tableExistsCache[$cacheKey] = $result;
+        return $result;
     }
 
     public function columnExists($tableName, $columnName) {
+        $cacheKey = $tableName . '.' . $columnName;
+        if (isset(self::$columnExistsCache[$cacheKey])) {
+            return self::$columnExistsCache[$cacheKey];
+        }
+        
         $row = $this->fetch(
             "SELECT COUNT(*) AS c
              FROM information_schema.columns
@@ -117,7 +133,9 @@ class Database {
             [$this->isPgsql() ? $this->schema : $this->db, $tableName, $columnName]
         );
 
-        return (int)($row['c'] ?? 0) > 0;
+        $result = (int)($row['c'] ?? 0) > 0;
+        self::$columnExistsCache[$cacheKey] = $result;
+        return $result;
     }
 
     public function getColumnDataType($tableName, $columnName) {

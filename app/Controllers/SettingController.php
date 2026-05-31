@@ -60,6 +60,11 @@ class SettingController extends BaseController {
         if (!in_array($attendanceMode, ['manual', 'biotime', 'qrcode', 'link'], true)) {
             $attendanceMode = 'manual';
         }
+        // Get service time configuration
+        $serviceTimesJson = AppConfig::getSetting('attendance_service_times', '{}');
+        $serviceTimes = json_decode($serviceTimesJson, true);
+        if (!is_array($serviceTimes)) $serviceTimes = [];
+        
         $attendanceConfig = [
             'mode' => $attendanceMode,
             'biotime_url' => (string)AppConfig::getSetting('attendance_biotime_url', ''),
@@ -70,7 +75,11 @@ class SettingController extends BaseController {
             'cloud_url' => (string)AppConfig::getSetting('attendance_cloud_url', ''),
             'cloud_token' => (string)AppConfig::getSetting('attendance_cloud_token', ''),
             'cloud_last_pushed_at' => (string)AppConfig::getSetting('attendance_cloud_last_pushed_at', ''),
+            'service_times' => $serviceTimes,
+            'custom_public_url' => (string)AppConfig::getSetting('attendance_custom_public_url', ''),
         ];
+        
+
         $storageConfig = [
             'supabase_url' => trim((string)Env::get('SUPABASE_URL', '')),
             'bucket' => trim((string)Env::get('SUPABASE_STORAGE_BUCKET', '')) !== '' ? trim((string)Env::get('SUPABASE_STORAGE_BUCKET', '')) : 'uploads',
@@ -135,7 +144,7 @@ class SettingController extends BaseController {
         $this->isAdmin();
         $name = trim((string)($_POST['church_name'] ?? ''));
         $theme = strtolower(trim((string)($_POST['theme'] ?? AppConfig::getSetting('theme', 'dark'))));
-        $theme = in_array($theme, ['dark', 'light', 'ocean', 'sunset'], true) ? $theme : 'dark';
+        $theme = in_array($theme, ['dark', 'light', 'ocean', 'sunset', 'blue'], true) ? $theme : 'dark';
         
         if (empty($name)) {
             Session::flash('error', 'Church name cannot be empty');
@@ -535,7 +544,7 @@ class SettingController extends BaseController {
         $this->isAdmin();
 
         $theme = $_POST['theme'] ?? 'dark';
-        $theme = in_array($theme, ['dark', 'light', 'ocean', 'sunset'], true) ? $theme : 'dark';
+        $theme = in_array($theme, ['dark', 'light', 'ocean', 'sunset', 'blue'], true) ? $theme : 'dark';
 
         $db = Database::getInstance();
         try {
@@ -702,6 +711,8 @@ class SettingController extends BaseController {
 
         $this->redirectSettings();
     }
+
+
 
     public function updateDatabaseConnection() {
         $this->isAdmin();
@@ -1270,6 +1281,7 @@ class SettingController extends BaseController {
         $cloudUrl = trim((string)($_POST['attendance_cloud_url'] ?? ''));
         $cloudToken = trim((string)($_POST['attendance_cloud_token'] ?? ''));
         $cloudTokenClear = (string)($_POST['attendance_cloud_token_clear'] ?? '') === '1';
+        $customPublicUrl = trim((string)($_POST['attendance_custom_public_url'] ?? ''));
 
         $biotimeUrl = rtrim($biotimeUrl, '/');
         if ($biotimeUrl !== '' && !preg_match('#^https?://#i', $biotimeUrl)) {
@@ -1285,12 +1297,33 @@ class SettingController extends BaseController {
             $cloudUrl = 'https://' . $cloudUrl;
         }
 
+        // Process service times
+        $serviceTypes = ['Sunday Service', 'Midweek Service', 'Youth Service', 'Children Service'];
+        $serviceTimes = [];
+        foreach ($serviceTypes as $serviceType) {
+            $keySlug = preg_replace('/[^a-zA-Z0-9]/', '_', strtolower($serviceType));
+            $presentStart = trim((string)($_POST['service_' . $keySlug . '_present_start'] ?? ''));
+            $presentEnd = trim((string)($_POST['service_' . $keySlug . '_present_end'] ?? ''));
+            $lateStart = trim((string)($_POST['service_' . $keySlug . '_late_start'] ?? ''));
+            $lateEnd = trim((string)($_POST['service_' . $keySlug . '_late_end'] ?? ''));
+            
+            if ($presentStart !== '' && $presentEnd !== '' && $lateStart !== '' && $lateEnd !== '') {
+                $serviceTimes[$serviceType] = [
+                    'present_start' => $presentStart,
+                    'present_end' => $presentEnd,
+                    'late_start' => $lateStart,
+                    'late_end' => $lateEnd,
+                ];
+            }
+        }
+
         try {
             $this->upsertSetting($db, 'attendance_mode', $mode);
             $this->upsertSetting($db, 'attendance_biotime_url', $biotimeUrl);
             $this->upsertSetting($db, 'attendance_biotime_username', $biotimeUsername);
             $this->upsertSetting($db, 'attendance_biotime_tz', $biotimeTz);
             $this->upsertSetting($db, 'attendance_cloud_url', $cloudUrl);
+            $this->upsertSetting($db, 'attendance_custom_public_url', $customPublicUrl);
 
             $oldToken = trim((string)AppConfig::getSetting('attendance_biotime_token', ''));
             $oldPass = trim((string)AppConfig::getSetting('attendance_biotime_password', ''));
@@ -1308,6 +1341,9 @@ class SettingController extends BaseController {
             } elseif ($cloudToken !== '' || $oldCloudToken === '') {
                 $this->upsertSetting($db, 'attendance_cloud_token', $cloudToken);
             }
+            
+            // Save service times
+            $this->upsertSetting($db, 'attendance_service_times', json_encode($serviceTimes));
 
             AuditLog::log('Updated attendance configuration', 'settings');
             Session::flash('success', 'Attendance settings saved.');

@@ -1954,11 +1954,7 @@ class FinanceController extends BaseController {
     }
 
     private function getSetting($db, $key, $default = '') {
-        $row = $db->fetch("SELECT value FROM settings WHERE key_name = ?", [$key]);
-        if ($row && array_key_exists('value', $row) && $row['value'] !== null) {
-            return (string)$row['value'];
-        }
-        return $default;
+        return AppConfig::getSetting($key, $default);
     }
 
     private function upsertSetting($db, $key, $value) {

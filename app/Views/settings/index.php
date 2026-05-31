@@ -514,6 +514,7 @@
                             <option value="light" <?php echo ($theme ?? 'dark') === 'light' ? 'selected' : ''; ?>>Light Theme</option>
                             <option value="ocean" <?php echo ($theme ?? 'dark') === 'ocean' ? 'selected' : ''; ?>>Ocean Theme</option>
                             <option value="sunset" <?php echo ($theme ?? 'dark') === 'sunset' ? 'selected' : ''; ?>>Sunset Theme</option>
+                            <option value="blue" <?php echo ($theme ?? 'dark') === 'blue' ? 'selected' : ''; ?>>Blue Theme</option>
                         </select>
                         <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px]"></i>
                     </div>
@@ -915,6 +916,15 @@
                     </div>
                     <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Only one mode will appear on the Attendance page</p>
                 </div>
+                
+                <div class="space-y-3">
+                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Custom Public URL (ngrok)</label>
+                    <div class="relative group">
+                        <i class="fas fa-globe absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-accent transition-colors"></i>
+                        <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="text" name="attendance_custom_public_url" value="<?php echo htmlspecialchars($att['custom_public_url'] ?? ''); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-14 pr-6 py-4 text-xs font-black text-slate-200 transition-all outline-none" placeholder="https://abc123def.ngrok-free.app">
+                    </div>
+                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Enter your ngrok or custom domain here (without /AG or /attendance/quick)</p>
+                </div>
 
                 <div id="attendance-biotime-fields" class="space-y-8">
                     <div class="space-y-3">
@@ -1008,6 +1018,133 @@
                     </div>
                 </div>
 
+                <?php
+                    // Get base URL
+                    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+                    $host = $_SERVER['HTTP_HOST'];
+                    $scriptName = dirname($_SERVER['SCRIPT_NAME']);
+                    $baseUrl = rtrim($protocol . $host . $scriptName, '/');
+                    $quickAttendanceUrl = $baseUrl . '/attendance/quick';
+                    
+                    // Use custom public URL if set
+                    $customPublicUrl = trim((string)($att['custom_public_url'] ?? ''));
+                    if ($customPublicUrl !== '') {
+                        $customPublicUrl = rtrim($customPublicUrl, '/');
+                        if (!preg_match('#^https?://#i', $customPublicUrl)) {
+                            $customPublicUrl = 'https://' . $customPublicUrl;
+                        }
+                        $quickAttendanceUrl = $customPublicUrl . $scriptName . '/attendance/quick';
+                    }
+                    
+                    // Try to get LAN IP
+                    $lanIp = '';
+                    if (!empty($_SERVER['SERVER_ADDR']) && $_SERVER['SERVER_ADDR'] !== '127.0.0.1' && $_SERVER['SERVER_ADDR'] !== '::1') {
+                        $lanIp = $_SERVER['SERVER_ADDR'];
+                    } elseif (function_exists('gethostbyname') && !empty($_SERVER['SERVER_NAME'])) {
+                        $ip = gethostbyname($_SERVER['SERVER_NAME']);
+                        if ($ip !== '127.0.0.1' && $ip !== '::1') {
+                            $lanIp = $ip;
+                        }
+                    }
+                    $lanUrl = $lanIp ? $protocol . $lanIp . ($_SERVER['SERVER_PORT'] != 80 && $_SERVER['SERVER_PORT'] != 443 ? ':' . $_SERVER['SERVER_PORT'] : '') . rtrim($scriptName, '/') . '/attendance/quick' : '';
+                ?>
+                <div class="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8 mb-6">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Quick Attendance URL</p>
+                    <p class="mt-3 text-sm font-black text-slate-200">Share this URL with members to mark attendance</p>
+                    
+                    <div class="mt-4 space-y-3">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1 relative group">
+                                <i class="fas fa-link absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                                <input id="quickUrlInput" type="text" value="<?php echo htmlspecialchars($quickAttendanceUrl); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl pl-12 pr-12 py-3 text-sm font-bold text-slate-200 outline-none">
+                            </div>
+                            <button id="copyUrlBtn" class="h-12 px-4 rounded-2xl bg-accent text-slate-900 font-black text-xs uppercase tracking-widest hover:shadow-xl hover:shadow-yellow-500/10 active:scale-95 transition-all">
+                                <i class="fas fa-copy mr-2"></i>
+                                Copy
+                            </button>
+                        </div>
+                        <?php if ($lanUrl): ?>
+                            <div class="flex items-center gap-3 pt-3 border-t border-white/10">
+                                <div class="flex-1 relative group">
+                                    <i class="fas fa-wifi absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                                    <input id="lanUrlInput" type="text" readonly value="<?php echo htmlspecialchars($lanUrl); ?>" class="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-12 py-3 text-sm font-bold text-slate-200 outline-none">
+                                </div>
+                                <button id="copyLanUrlBtn" class="h-12 px-4 rounded-2xl bg-white/5 border border-white/10 text-slate-200 hover:bg-white/10 transition-all font-black text-xs uppercase tracking-widest">
+                                    <i class="fas fa-copy mr-2"></i>
+                                    Copy
+                                </button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-white/10">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Access Instructions</p>
+                        <div class="space-y-3 text-xs text-slate-300">
+                            <div class="flex gap-3">
+                                <div class="w-8 h-8 bg-accent/10 border border-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-home text-accent"></i>
+                                </div>
+                                <div>
+                                    <p class="font-bold text-white mb-1">Same Wi-Fi (LAN)</p>
+                                    <p class="text-slate-400">Members on the same Wi-Fi as your computer can use the LAN URL above!</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-3">
+                                <div class="w-8 h-8 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-globe text-blue-400"></i>
+                                </div>
+                                <div>
+                                    <p class="font-bold text-white mb-1">From Anywhere (Internet)</p>
+                                    <p class="text-slate-400">To use from outside your network, use one of these options:</p>
+                                    <ul class="mt-2 space-y-1 pl-4 list-disc">
+                                        <li><strong class="text-white">Option 1:</strong> Use <a href="https://ngrok.com" target="_blank" class="text-accent underline">ngrok</a> (free, temporary)</li>
+                                        <li><strong class="text-white">Option 2:</strong> Host on a web host (like Hostinger, Namecheap, DigitalOcean)</li>
+                                        <li><strong class="text-white">Option 3:</strong> Port forwarding on your router (advanced)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Service Time Configuration</p>
+                    <p class="mt-3 text-sm font-black text-slate-200">Customize present/late/absent times for each service type</p>
+                    
+                    <?php
+                    $serviceTypes = ['Sunday Service', 'Midweek Service', 'Youth Service', 'Children Service'];
+                    $serviceTimes = $att['service_times'] ?? [];
+                    foreach ($serviceTypes as $serviceType):
+                        $keySlug = preg_replace('/[^a-zA-Z0-9]/', '_', strtolower($serviceType));
+                        $presentStart = $serviceTimes[$serviceType]['present_start'] ?? '08:00';
+                        $presentEnd = $serviceTimes[$serviceType]['present_end'] ?? '10:30';
+                        $lateStart = $serviceTimes[$serviceType]['late_start'] ?? '10:31';
+                        $lateEnd = $serviceTimes[$serviceType]['late_end'] ?? '12:00';
+                    ?>
+                        <div class="mt-6 border-t border-white/10 pt-6">
+                            <h5 class="text-sm font-black text-white mb-4"><?php echo htmlspecialchars($serviceType); ?></h5>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div class="space-y-3">
+                                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Present Start</label>
+                                    <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="time" name="service_<?php echo $keySlug; ?>_present_start" value="<?php echo htmlspecialchars($presentStart); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-4 py-4 text-xs font-black text-slate-200 transition-all outline-none">
+                                </div>
+                                <div class="space-y-3">
+                                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Present End</label>
+                                    <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="time" name="service_<?php echo $keySlug; ?>_present_end" value="<?php echo htmlspecialchars($presentEnd); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-4 py-4 text-xs font-black text-slate-200 transition-all outline-none">
+                                </div>
+                                <div class="space-y-3">
+                                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Late Start</label>
+                                    <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="time" name="service_<?php echo $keySlug; ?>_late_start" value="<?php echo htmlspecialchars($lateStart); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-4 py-4 text-xs font-black text-slate-200 transition-all outline-none">
+                                </div>
+                                <div class="space-y-3">
+                                    <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Absent After</label>
+                                    <input <?php echo $isAdmin ? '' : 'disabled'; ?> type="time" name="service_<?php echo $keySlug; ?>_late_end" value="<?php echo htmlspecialchars($lateEnd); ?>" class="w-full bg-white/5 border border-white/10 focus:border-accent rounded-2xl px-4 py-4 text-xs font-black text-slate-200 transition-all outline-none">
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
                 <button <?php echo $isAdmin ? '' : 'disabled'; ?> type="submit" class="w-full bg-accent text-slate-900 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover-glow-yellow active:scale-95 transition-all shadow-xl shadow-yellow-500/10 disabled:opacity-60 disabled:cursor-not-allowed">
                     Save Attendance Settings
                 </button>
@@ -1017,27 +1154,73 @@
             </form>
         </div>
 
+
+
         <script>
             (function () {
                 const select = document.getElementById('attendance-mode');
                 const biotime = document.getElementById('attendance-biotime-fields');
                 const quick = document.getElementById('attendance-quick-fields');
-                if (!select || !biotime || !quick) return;
-                const apply = () => {
-                    const v = (select.value || 'manual').toLowerCase();
-                    if (v === 'biotime') {
-                        biotime.classList.remove('hidden');
-                        quick.classList.add('hidden');
-                    } else if (v === 'qrcode' || v === 'link') {
-                        biotime.classList.add('hidden');
-                        quick.classList.remove('hidden');
-                    } else {
-                        biotime.classList.add('hidden');
-                        quick.classList.add('hidden');
-                    }
-                };
-                select.addEventListener('change', apply);
-                apply();
+                if (select && biotime && quick) {
+                    const apply = () => {
+                        const v = (select.value || 'manual').toLowerCase();
+                        if (v === 'biotime') {
+                            biotime.classList.remove('hidden');
+                            quick.classList.add('hidden');
+                        } else if (v === 'qrcode' || v === 'link') {
+                            biotime.classList.add('hidden');
+                            quick.classList.remove('hidden');
+                        } else {
+                            biotime.classList.add('hidden');
+                            quick.classList.add('hidden');
+                        }
+                    };
+                    select.addEventListener('change', apply);
+                    apply();
+                }
+
+                // Copy URL functionality
+                const copyUrlBtn = document.getElementById('copyUrlBtn');
+                const quickUrlInput = document.getElementById('quickUrlInput');
+                if (copyUrlBtn && quickUrlInput) {
+                    copyUrlBtn.addEventListener('click', async () => {
+                        try {
+                            await navigator.clipboard.writeText(quickUrlInput.value);
+                            copyUrlBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Copied!';
+                            setTimeout(() => {
+                                copyUrlBtn.innerHTML = '<i class="fas fa-copy mr-2"></i>Copy';
+                            }, 2000);
+                        } catch (e) {
+                            quickUrlInput.select();
+                            document.execCommand('copy');
+                            copyUrlBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Copied!';
+                            setTimeout(() => {
+                                copyUrlBtn.innerHTML = '<i class="fas fa-copy mr-2"></i>Copy';
+                            }, 2000);
+                        }
+                    });
+                }
+
+                const copyLanUrlBtn = document.getElementById('copyLanUrlBtn');
+                const lanUrlInput = document.getElementById('lanUrlInput');
+                if (copyLanUrlBtn && lanUrlInput) {
+                    copyLanUrlBtn.addEventListener('click', async () => {
+                        try {
+                            await navigator.clipboard.writeText(lanUrlInput.value);
+                            copyLanUrlBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Copied!';
+                            setTimeout(() => {
+                                copyLanUrlBtn.innerHTML = '<i class="fas fa-copy mr-2"></i>Copy';
+                            }, 2000);
+                        } catch (e) {
+                            lanUrlInput.select();
+                            document.execCommand('copy');
+                            copyLanUrlBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Copied!';
+                            setTimeout(() => {
+                                copyLanUrlBtn.innerHTML = '<i class="fas fa-copy mr-2"></i>Copy';
+                            }, 2000);
+                        }
+                    });
+                }
             })();
         </script>
 
@@ -1059,6 +1242,7 @@
                             <option value="light" <?php echo ($theme ?? 'dark') === 'light' ? 'selected' : ''; ?>>Light Theme</option>
                             <option value="ocean" <?php echo ($theme ?? 'dark') === 'ocean' ? 'selected' : ''; ?>>Ocean Theme</option>
                             <option value="sunset" <?php echo ($theme ?? 'dark') === 'sunset' ? 'selected' : ''; ?>>Sunset Theme</option>
+                            <option value="blue" <?php echo ($theme ?? 'dark') === 'blue' ? 'selected' : ''; ?>>Blue Theme</option>
                         </select>
                         <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px]"></i>
                     </div>

@@ -1,0 +1,32 @@
+
+=====================================================
+ UPPER ROOM ASSEMBLY CMS - WINDOWS INSTALLER BUILD
+=====================================================
+
+WHAT YOU NEED:
+--------------
+1. Inno Setup - Download from: https://jrsoftware.org/isdl.php
+   (Get the latest "innosetup-x.x.x.exe" installer)
+
+HOW TO BUILD THE INSTALLER:
+---------------------------
+1. Install Inno Setup on your Windows computer
+2. Double-click "URA_CMS_Installer.iss" - this will open Inno Setup
+3. In Inno Setup, click "Build" → "Compile" (or press F9)
+4. Wait for compilation to finish
+5. Your installer will be in the "Output" folder!
+
+ALTERNATIVE: SIMPLE ZIP PACKAGE
+-------------------------------
+If you don't want to build an EXE:
+1. Copy your entire AG folder
+2. Zip it up
+3. Include URA-CMS.bat as the launcher
+
+FOR STANDALONE DESKTOP APP (PHP Desktop):
+-----------------------------------------
+For a true desktop app that doesn't require XAMPP:
+1. Download PHP Desktop from: https://github.com/cztomczak/phpdesktop
+2. Follow their documentation to package your app!
+
+=====================================================

@@ -20,6 +20,7 @@ class AttendanceController extends BaseController {
         $cloudTokenSet = trim((string)AppConfig::getSetting('attendance_cloud_token', '')) !== '';
         $cloudConfigured = ($cloudUrl !== '' && $cloudTokenSet);
         $cloudLastPushedAt = trim((string)AppConfig::getSetting('attendance_cloud_last_pushed_at', ''));
+        $customPublicUrl = rtrim(trim((string)AppConfig::getSetting('attendance_custom_public_url', '')), '/');
 
         $serviceDate = trim((string)($_GET['service_date'] ?? date('Y-m-d')));
         $serviceType = trim((string)($_GET['service_type'] ?? 'Sunday Service'));
@@ -45,10 +46,12 @@ class AttendanceController extends BaseController {
             if ($checkInRaw === '') {
                 $checkInRaw = trim((string)($r['imported_at'] ?? ''));
             }
-            $r['computed_status'] = $this->computeAttendanceStatus($r['service_date'] ?? '', $checkInRaw !== '' ? $checkInRaw : null);
+            $r['computed_status'] = $this->computeAttendanceStatus($r['service_date'] ?? '', $checkInRaw !== '' ? $checkInRaw : null, $r['service_type'] ?? 'Sunday Service');
         }
         unset($r);
         
+        $formattedServiceTimes = $this->getFormattedServiceTimes($serviceType);
+
         View::render('attendance.index', [
             'title' => 'Attendance Management',
             'attendance_rate' => $attendanceModel->getAttendanceRate(),
@@ -67,7 +70,9 @@ class AttendanceController extends BaseController {
             'daily_report' => $dailyReport,
             'can_manage_attendance' => Auth::isAdmin(),
             'can_download_attendance' => (Auth::isAdmin() || Auth::isPastor() || Auth::isVisitationTeam()),
-            'attendance_page_route' => 'attendance'
+            'attendance_page_route' => 'attendance',
+            'formatted_service_times' => $formattedServiceTimes,
+            'custom_public_url' => $customPublicUrl
         ]);
     }
 
@@ -88,6 +93,7 @@ class AttendanceController extends BaseController {
         $cloudTokenSet = trim((string)AppConfig::getSetting('attendance_cloud_token', '')) !== '';
         $cloudConfigured = ($cloudUrl !== '' && $cloudTokenSet);
         $cloudLastPushedAt = trim((string)AppConfig::getSetting('attendance_cloud_last_pushed_at', ''));
+        $customPublicUrl = rtrim(trim((string)AppConfig::getSetting('attendance_custom_public_url', '')), '/');
 
         $serviceDate = trim((string)($_GET['service_date'] ?? date('Y-m-d')));
         $serviceType = trim((string)($_GET['service_type'] ?? 'Sunday Service'));
@@ -113,13 +119,18 @@ class AttendanceController extends BaseController {
             if ($checkInRaw === '') {
                 $checkInRaw = trim((string)($r['imported_at'] ?? ''));
             }
-            $r['computed_status'] = $this->computeAttendanceStatus($r['service_date'] ?? '', $checkInRaw !== '' ? $checkInRaw : null);
+            $r['computed_status'] = $this->computeAttendanceStatus($r['service_date'] ?? '', $checkInRaw !== '' ? $checkInRaw : null, $r['service_type'] ?? 'Sunday Service');
         }
         unset($r);
+
+        $formattedServiceTimes = $this->getFormattedServiceTimes($serviceType);
 
         View::render('attendance.index', [
             'title' => 'Attendance',
             'attendance_rate' => $attendanceModel->getAttendanceRate(),
+            'today_attendance_rate' => $attendanceModel->getTodayAttendanceRate(),
+            'weekly_attendance_rate' => $attendanceModel->getWeeklyAttendanceRate(),
+            'monthly_attendance_rate' => $attendanceModel->getMonthlyAttendanceRate(),
             'recent_records' => $recent,
             'attendance_mode' => $mode,
             'biotime_configured' => $biotimeConfigured,
@@ -135,7 +146,8 @@ class AttendanceController extends BaseController {
             'daily_report' => $dailyReport,
             'can_manage_attendance' => false,
             'can_download_attendance' => true,
-            'attendance_page_route' => 'attendance/view'
+            'attendance_page_route' => 'attendance/view',
+            'formatted_service_times' => $formattedServiceTimes
         ]);
     }
 
@@ -173,9 +185,14 @@ class AttendanceController extends BaseController {
         $departments = $deptModel->all('name ASC');
         $dailyReport = $this->buildServiceAttendanceReport($serviceDate, $serviceType, $myDeptId);
 
+        $formattedServiceTimes = $this->getFormattedServiceTimes($serviceType);
+
         View::render('attendance.index', [
             'title' => 'Attendance',
             'attendance_rate' => $attendanceModel->getAttendanceRate(),
+            'today_attendance_rate' => $attendanceModel->getTodayAttendanceRate(),
+            'weekly_attendance_rate' => $attendanceModel->getWeeklyAttendanceRate(),
+            'monthly_attendance_rate' => $attendanceModel->getMonthlyAttendanceRate(),
             'recent_records' => [],
             'attendance_mode' => $this->getAttendanceMode(),
             'biotime_configured' => false,
@@ -189,10 +206,10 @@ class AttendanceController extends BaseController {
             'department_id' => $myDeptId,
             'departments' => $departments,
             'daily_report' => $dailyReport,
-            'can_manage_attendance' => false,
+            'can_manage_attendance' => true,
             'can_download_attendance' => true,
             'attendance_page_route' => 'attendance/department',
-            'service_only' => true
+            'formatted_service_times' => $formattedServiceTimes
         ]);
     }
 
@@ -310,7 +327,7 @@ class AttendanceController extends BaseController {
         $skipped = 0;
         $tz = $this->resolveAttendanceTimezone();
         $deviceTime = (new DateTimeImmutable($serviceDate . ' 08:00:00', $tz))->format('Y-m-d H:i:s');
-        $status = $this->computeAttendanceStatus($serviceDate, $deviceTime);
+        $status = $this->computeAttendanceStatus($serviceDate, $deviceTime, $serviceType);
         foreach ($memberIds as $memberId) {
             $memberId = (int)$memberId;
             if ($memberId <= 0) {
@@ -522,7 +539,7 @@ class AttendanceController extends BaseController {
             }
 
             $deviceTime = trim((string)($parsed['device_time'] ?? ''));
-            $status = $this->computeAttendanceStatus($serviceDate, $deviceTime !== '' ? $deviceTime : null);
+            $status = $this->computeAttendanceStatus($serviceDate, $deviceTime !== '' ? $deviceTime : null, $serviceType);
 
             $attendanceModel->create([
                 'member_id' => $memberId,
@@ -550,12 +567,6 @@ class AttendanceController extends BaseController {
 
     public function quick()
     {
-        if (Session::get('user_role') === 'dept_head') {
-            Session::flash('error', 'Unauthorized access.');
-            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
-            header("Location: $base/dashboard");
-            exit;
-        }
         $mode = $this->getAttendanceMode();
         if (!in_array($mode, ['qrcode', 'link'], true)) {
             $mode = 'link';
@@ -577,17 +588,11 @@ class AttendanceController extends BaseController {
             'attendance_mode' => $mode,
             'service_date' => $serviceDate,
             'service_type' => $serviceType
-        ]);
+        ], false);
     }
 
     public function quickMark()
     {
-        if (Session::get('user_role') === 'dept_head') {
-            Session::flash('error', 'Unauthorized access.');
-            $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
-            header("Location: $base/dashboard");
-            exit;
-        }
         $mode = $this->getAttendanceMode();
         if (!in_array($mode, ['qrcode', 'link'], true)) {
             $mode = 'link';
@@ -645,7 +650,7 @@ class AttendanceController extends BaseController {
         $now = new DateTimeImmutable('now', $tz);
         $checkIn = new DateTimeImmutable($serviceDate . ' ' . $now->format('H:i:s'), $tz);
         $deviceTime = $checkIn->format('Y-m-d H:i:s');
-        $status = $this->computeAttendanceStatus($serviceDate, $deviceTime);
+        $status = $this->computeAttendanceStatus($serviceDate, $deviceTime, $serviceType);
 
         $attendanceModel->create([
             'member_id' => $memberId,
@@ -957,6 +962,18 @@ class AttendanceController extends BaseController {
                 }
             }
         });
+
+        SchemaState::once('attendance_schema_v2', function () use ($db) {
+            // Update status ENUM to include Late
+            if (!$db->isPgsql()) {
+                $db->query("ALTER TABLE attendance MODIFY COLUMN status ENUM('Present', 'Absent', 'Excused', 'Late') DEFAULT 'Present'");
+            }
+
+            // Update service_type ENUM to include new options
+            if (!$db->isPgsql()) {
+                $db->query("ALTER TABLE attendance MODIFY COLUMN service_type ENUM('Sunday Service', 'Mid-week Service', 'Midweek Service', 'Youth Meeting', 'Youth Service', 'Children Service', 'Special Event') DEFAULT 'Sunday Service'");
+            }
+        });
     }
 
     private function resolveAttendanceTimezone(): DateTimeZone
@@ -969,7 +986,7 @@ class AttendanceController extends BaseController {
         }
     }
 
-    private function computeAttendanceStatus(string $serviceDate, ?string $checkInDateTime): string
+    private function computeAttendanceStatus(string $serviceDate, ?string $checkInDateTime, string $serviceType = 'Sunday Service'): string
     {
         $serviceDate = trim($serviceDate);
         if ($serviceDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $serviceDate)) {
@@ -979,6 +996,14 @@ class AttendanceController extends BaseController {
         if ($checkInDateTime === null || $checkInDateTime === '') {
             return 'Absent';
         }
+
+        // Backwards compatibility: map old service type names to new ones
+        $serviceTypeMap = [
+            'Mid-week Service' => 'Midweek Service',
+            'Youth Meeting' => 'Youth Service',
+            'Special Event' => 'Sunday Service' // default to Sunday Service for Special Event
+        ];
+        $serviceType = $serviceTypeMap[$serviceType] ?? $serviceType;
 
         $tz = $this->resolveAttendanceTimezone();
         try {
@@ -991,20 +1016,86 @@ class AttendanceController extends BaseController {
             return 'Absent';
         }
 
-        $presentEnd = new DateTimeImmutable($serviceDate . ' 10:30:59', $tz);
-        $lateStart = new DateTimeImmutable($serviceDate . ' 10:31:00', $tz);
-        $lateEnd = new DateTimeImmutable($serviceDate . ' 12:00:00', $tz);
+        // Get service time configuration
+        $serviceTimesJson = AppConfig::getSetting('attendance_service_times', '{}');
+        $serviceTimes = json_decode($serviceTimesJson, true);
+        if (!is_array($serviceTimes)) $serviceTimes = [];
+        
+        // Default times if no config
+        $presentStartTime = '08:00:00';
+        $presentEndTime = '10:30:59';
+        $lateStartTime = '10:31:00';
+        $lateEndTime = '12:00:00';
+        
+        if (isset($serviceTimes[$serviceType])) {
+            $config = $serviceTimes[$serviceType];
+            if (isset($config['present_start'])) {
+                $presentStartTime = $config['present_start'] . ':00';
+            }
+            if (isset($config['present_end'])) {
+                $presentEndTime = $config['present_end'] . ':59';
+            }
+            if (isset($config['late_start'])) {
+                $lateStartTime = $config['late_start'] . ':00';
+            }
+            if (isset($config['late_end'])) {
+                $lateEndTime = $config['late_end'] . ':00';
+            }
+        }
+
+        $presentStart = new DateTimeImmutable($serviceDate . ' ' . $presentStartTime, $tz);
+        $presentEnd = new DateTimeImmutable($serviceDate . ' ' . $presentEndTime, $tz);
+        $lateStart = new DateTimeImmutable($serviceDate . ' ' . $lateStartTime, $tz);
+        $lateEnd = new DateTimeImmutable($serviceDate . ' ' . $lateEndTime, $tz);
 
         if ($dt > $lateEnd) {
             return 'Absent';
         }
-        if ($dt >= $lateStart) {
-            return 'Late';
-        }
-        if ($dt <= $presentEnd) {
+        if ($dt >= $presentStart && $dt <= $presentEnd) {
             return 'Present';
         }
-        return 'Present';
+        // If after present end but before or at late end, it's Late
+        if ($dt > $presentEnd && $dt <= $lateEnd) {
+            return 'Late';
+        }
+        return 'Absent';
+    }
+
+    private function getFormattedServiceTimes(string $serviceType): array
+    {
+        // Backwards compatibility: map old service type names to new ones
+        $serviceTypeMap = [
+            'Mid-week Service' => 'Midweek Service',
+            'Youth Meeting' => 'Youth Service',
+            'Special Event' => 'Sunday Service'
+        ];
+        $serviceType = $serviceTypeMap[$serviceType] ?? $serviceType;
+
+        // Get service time configuration
+        $serviceTimesJson = AppConfig::getSetting('attendance_service_times', '{}');
+        $serviceTimes = json_decode($serviceTimesJson, true);
+        if (!is_array($serviceTimes)) $serviceTimes = [];
+
+        // Default times if no config
+        $presentStart = '07:00';
+        $presentEnd = '10:30';
+        $lateStart = '10:31';
+        $lateEnd = '12:00';
+
+        if (isset($serviceTimes[$serviceType])) {
+            $config = $serviceTimes[$serviceType];
+            $presentStart = $config['present_start'] ?? $presentStart;
+            $presentEnd = $config['present_end'] ?? $presentEnd;
+            $lateStart = $config['late_start'] ?? $lateStart;
+            $lateEnd = $config['late_end'] ?? $lateEnd;
+        }
+
+        return [
+            'present_start' => $presentStart,
+            'present_end' => $presentEnd,
+            'late_start' => $lateStart,
+            'late_end' => $lateEnd
+        ];
     }
 
     private function buildServiceAttendanceReport(string $serviceDate, string $serviceType, ?int $departmentId = null): array
@@ -1058,12 +1149,34 @@ class AttendanceController extends BaseController {
             ];
         }
 
+        // Backwards compatibility: map old service type names to new ones
+        $serviceTypeMap = [
+            'Mid-week Service' => 'Midweek Service',
+            'Youth Meeting' => 'Youth Service',
+            'Special Event' => 'Sunday Service'
+        ];
+        // Create reverse mapping: new service type → [old names]
+        $reverseServiceTypeMap = [];
+        foreach ($serviceTypeMap as $old => $new) {
+            if (!isset($reverseServiceTypeMap[$new])) {
+                $reverseServiceTypeMap[$new] = [];
+            }
+            $reverseServiceTypeMap[$new][] = $old;
+        }
+        $serviceTypesToFetch = [$serviceType];
+        if (isset($reverseServiceTypeMap[$serviceType])) {
+            $serviceTypesToFetch = array_merge($serviceTypesToFetch, $reverseServiceTypeMap[$serviceType]);
+        }
+        $serviceTypesToFetch = array_unique($serviceTypesToFetch);
+        $placeholders = implode(',', array_fill(0, count($serviceTypesToFetch), '?'));
+        $attendanceParams = [$serviceDate];
+        $attendanceParams = array_merge($attendanceParams, $serviceTypesToFetch);
         $attendanceRows = $db->fetchAll(
             "SELECT a.*
              FROM attendance a
              WHERE a.service_date = ?
-               AND a.service_type = ?",
-            [$serviceDate, $serviceType]
+               AND a.service_type IN ($placeholders)",
+            $attendanceParams
         ) ?: [];
 
         $attByMemberId = [];
@@ -1096,7 +1209,7 @@ class AttendanceController extends BaseController {
                 if ($checkIn === '') {
                     $checkIn = trim((string)($a['imported_at'] ?? ''));
                 }
-                $status = $this->computeAttendanceStatus($serviceDate, $checkIn !== '' ? $checkIn : null);
+                $status = $this->computeAttendanceStatus($serviceDate, $checkIn !== '' ? $checkIn : null, $serviceType);
             }
 
             if ($status === 'Present') $present++;
@@ -1458,5 +1571,28 @@ class AttendanceController extends BaseController {
         }
 
         return ['ok' => true, 'status' => $status, 'body' => $bodyStr, 'json' => $json];
+    }
+
+    public function searchMembers()
+    {
+        $this->ensureAttendanceSchema();
+        $term = trim((string)($_GET['q'] ?? ''));
+        $memberModel = new Member();
+        $members = $memberModel->searchAndFilter($term);
+        
+        $results = [];
+        foreach ($members as $m) {
+            $results[] = [
+                'id' => (int)($m['id'] ?? 0),
+                'first_name' => trim((string)($m['first_name'] ?? '')),
+                'last_name' => trim((string)($m['last_name'] ?? '')),
+                'member_code' => trim((string)($m['member_code'] ?? '')),
+                'bio_id' => trim((string)($m['bio_id'] ?? ''))
+            ];
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode($results);
+        exit;
     }
 }
